@@ -1,53 +1,92 @@
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import pg from "pg";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DB_FILE = path.join(__dirname, "data", "users.json");
+const { Pool } = pg;
 
-function ensureDbFile() {
-  if (!fs.existsSync(path.dirname(DB_FILE))) {
-    fs.mkdirSync(path.dirname(DB_FILE), { recursive: true });
-  }
-  if (!fs.existsSync(DB_FILE)) {
-    fs.writeFileSync(DB_FILE, "[]", "utf-8");
-  }
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL?.includes("localhost")
+    ? false
+    : { rejectUnauthorized: false },
+});
+
+function mapRow(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    passwordHash: row.password_hash,
+    userType: row.user_type,
+    company: row.company,
+    isVerified: row.is_verified,
+    verificationToken: row.verification_token,
+    createdAt: row.created_at,
+  };
 }
 
-function readUsers() {
-  ensureDbFile();
-  const raw = fs.readFileSync(DB_FILE, "utf-8");
-  return JSON.parse(raw);
-}
-
-function writeUsers(users) {
-  ensureDbFile();
-  fs.writeFileSync(DB_FILE, JSON.stringify(users, null, 2), "utf-8");
-}
-
-export function findUserByEmail(email) {
-  return readUsers().find(
-    (user) => user.email.toLowerCase() === email.toLowerCase(),
+export async function findUserByEmail(email) {
+  const { rows } = await pool.query(
+    "SELECT * FROM users WHERE lower(email) = lower($1)",
+    [email],
   );
+  return mapRow(rows[0]);
 }
 
-export function findUserByVerificationToken(token) {
-  return readUsers().find((user) => user.verificationToken === token);
+export async function findUserByVerificationToken(token) {
+  const { rows } = await pool.query(
+    "SELECT * FROM users WHERE verification_token = $1",
+    [token],
+  );
+  return mapRow(rows[0]);
 }
 
-export function createUser(user) {
-  const users = readUsers();
-  const newUser = { id: users.length + 1, ...user };
-  users.push(newUser);
-  writeUsers(users);
-  return newUser;
+export async function createUser(user) {
+  const { rows } = await pool.query(
+    `INSERT INTO users (name, email, password_hash, user_type, company, is_verified, verification_token)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     RETURNING *`,
+    [
+      user.name,
+      user.email,
+      user.passwordHash,
+      user.userType,
+      user.company,
+      user.isVerified,
+      user.verificationToken,
+    ],
+  );
+  return mapRow(rows[0]);
 }
 
-export function updateUser(id, updates) {
-  const users = readUsers();
-  const index = users.findIndex((user) => user.id === id);
-  if (index === -1) return null;
-  users[index] = { ...users[index], ...updates };
-  writeUsers(users);
-  return users[index];
+export async function updateUser(id, updates) {
+  const columnMap = {
+    name: "name",
+    email: "email",
+    passwordHash: "password_hash",
+    userType: "user_type",
+    company: "company",
+    isVerified: "is_verified",
+    verificationToken: "verification_token",
+  };
+
+  const fields = [];
+  const values = [];
+  let i = 1;
+
+  for (const [key, value] of Object.entries(updates)) {
+    const column = columnMap[key];
+    if (!column) continue;
+    fields.push(`${column} = $${i}`);
+    values.push(value);
+    i += 1;
+  }
+
+  if (fields.length === 0) return null;
+
+  values.push(id);
+  const { rows } = await pool.query(
+    `UPDATE users SET ${fields.join(", ")} WHERE id = $${i} RETURNING *`,
+    values,
+  );
+  return mapRow(rows[0]);
 }

@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 
+const API_URL = import.meta.env.VITE_API_URL || "";
+
 const categorySections = [
   {
     title: "Prona",
@@ -394,7 +396,7 @@ function App() {
     setAuthSubmitting(true);
     setAuthMessage("");
     try {
-      const response = await fetch("/api/register", {
+      const response = await fetch(`${API_URL}/api/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, email, password, userType, company }),
@@ -426,7 +428,7 @@ function App() {
     setAuthSubmitting(true);
     setAuthMessage("");
     try {
-      const response = await fetch("/api/login", {
+      const response = await fetch(`${API_URL}/api/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -463,7 +465,7 @@ function App() {
   const handleResendVerification = async (email) => {
     setAuthSubmitting(true);
     try {
-      const response = await fetch("/api/resend-verification", {
+      const response = await fetch(`${API_URL}/api/resend-verification`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
@@ -572,7 +574,7 @@ function App() {
       return;
     }
 
-    fetch(`/api/verify?token=${encodeURIComponent(token)}`)
+    fetch(`${API_URL}/api/verify?token=${encodeURIComponent(token)}`)
       .then(async (response) => {
         const data = await response.json();
         setVerifyStatus(response.ok ? "success" : "error");
