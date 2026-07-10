@@ -562,16 +562,9 @@ img {
   font-size: 0.9rem;
 }
 
-.account-header {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-bottom: 1.25rem;
-}
-
 .account-avatar {
-  width: 64px;
-  height: 64px;
+  width: 48px;
+  height: 48px;
   flex-shrink: 0;
   border-radius: 50%;
   overflow: hidden;
@@ -580,7 +573,7 @@ img {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.5rem;
+  font-size: 1.15rem;
   font-weight: 700;
 }
 
@@ -590,26 +583,23 @@ img {
   object-fit: cover;
 }
 
-.account-meta-line {
-  margin: 0.35rem 0 0;
-  color: #4b5563;
+.account-avatar-sm {
+  width: 40px;
+  height: 40px;
+  font-size: 1rem;
 }
 
-.account-actions {
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
-  margin: 1.25rem 0;
+.account-avatar-lg {
+  width: 88px;
+  height: 88px;
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
 }
 
 .profile-edit-form {
   display: grid;
   gap: 1rem;
-  margin: 1.25rem 0;
-  padding: 1.5rem;
-  border-radius: 18px;
-  background: #f9faf8;
-  border: 1px solid rgba(17, 24, 39, 0.08);
+  max-width: 28rem;
 }
 
 .profile-edit-form label {
@@ -619,11 +609,120 @@ img {
   font-weight: 500;
 }
 
-.avatar-preview {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  object-fit: cover;
+.profile-edit-form input:disabled {
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.dashboard-section {
+  padding: 3rem 0 4rem;
+}
+
+.dashboard-panel {
+  background: #fff;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.06);
+}
+
+.dashboard-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.15rem 1.75rem;
+  border-bottom: 1px solid rgba(17, 24, 39, 0.08);
+  background: #f9faf8;
+}
+
+.dashboard-user {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.dashboard-user strong {
+  display: block;
+}
+
+.dashboard-user-type {
+  font-size: 0.85rem;
+  color: #4b5563;
+}
+
+.dashboard-body {
+  display: flex;
+  align-items: stretch;
+  min-height: 26rem;
+}
+
+.dashboard-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  width: 220px;
+  flex-shrink: 0;
+  padding: 1.25rem;
+  border-right: 1px solid rgba(17, 24, 39, 0.08);
+  background: #f9faf8;
+}
+
+.dashboard-nav-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  border: none;
+  background: transparent;
+  color: #374151;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.dashboard-nav-item:hover {
+  background: rgba(17, 24, 39, 0.06);
+}
+
+.dashboard-nav-item.active {
+  background: #111;
+  color: #fff;
+}
+
+.dashboard-content {
+  flex: 1;
+  min-width: 0;
+  padding: 1.75rem 2rem;
+}
+
+.dashboard-overview p {
+  color: #374151;
+}
+
+.dashboard-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(17, 24, 39, 0.08);
+}
+
+.dashboard-tab {
+  padding: 0.75rem 1.1rem;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.dashboard-tab.active {
+  color: #111;
+  border-bottom-color: #c9922f;
 }
 
 .post-form-card label {
@@ -732,6 +831,27 @@ img {
   .main-nav a:not(.button) {
     padding: 0.5rem 0;
     text-align: center;
+  }
+
+  .dashboard-body {
+    flex-direction: column;
+  }
+
+  .dashboard-sidebar {
+    width: 100%;
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: none;
+    border-bottom: 1px solid rgba(17, 24, 39, 0.08);
+  }
+
+  .dashboard-nav-item {
+    flex-shrink: 0;
+    width: auto;
+  }
+
+  .dashboard-content {
+    padding: 1.5rem;
   }
 }
 

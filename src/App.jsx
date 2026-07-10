@@ -390,7 +390,8 @@ function App() {
   const [resetSubmitting, setResetSubmitting] = useState(false);
   const [resetDone, setResetDone] = useState(false);
 
-  const [profileEditing, setProfileEditing] = useState(false);
+  const [dashboardSection, setDashboardSection] = useState("overview");
+  const [profileTab, setProfileTab] = useState("personal");
   const [profileForm, setProfileForm] = useState({
     name: "",
     phone: "",
@@ -571,7 +572,7 @@ function App() {
     }
   };
 
-  const startProfileEdit = () => {
+  const openProfileSection = () => {
     setProfileForm({
       name: currentUser.name || "",
       phone: currentUser.phone || "",
@@ -580,7 +581,7 @@ function App() {
       avatarUrl: currentUser.avatarUrl || "",
     });
     setProfileMessage("");
-    setProfileEditing(true);
+    setDashboardSection("profile");
   };
 
   const handleProfileChange = (event) => {
@@ -650,7 +651,6 @@ function App() {
       window.localStorage.setItem("eDiasporaUser", JSON.stringify(data.user));
       setProfileError(false);
       setProfileMessage(data.message);
-      setProfileEditing(false);
     } catch (err) {
       setProfileError(true);
       setProfileMessage("Nuk u arrit lidhja me serverin. Provoni përsëri.");
@@ -1036,62 +1036,28 @@ function App() {
             </div>
           </section>
         ) : isAuthPage ? (
-          <section className="auth-panel-section container" id="auth">
-            <div className="auth-grid">
-              {currentUser ? (
-              <div className="account-card">
-                <div className="account-header">
-                  <div className="account-avatar">
-                    {currentUser.avatarUrl ? (
-                      <img src={currentUser.avatarUrl} alt={currentUser.name} />
-                    ) : (
-                      <span>{currentUser.name?.charAt(0)?.toUpperCase()}</span>
-                    )}
-                  </div>
-                  <div>
-                    <h3>Miresevini, {currentUser.name}</h3>
-                    <p className="account-meta-line">
-                      Llogaria juaj: <strong>{currentUser.userType}</strong>
-                      {currentUser.company && (
-                        <>
-                          {" "}
-                          | Kompania: <strong>{currentUser.company}</strong>
-                        </>
+          <section
+            className={currentUser ? "dashboard-section container" : "auth-panel-section container"}
+            id="auth"
+          >
+            {currentUser ? (
+              <div className="dashboard-panel">
+                <div className="dashboard-topbar">
+                  <div className="dashboard-user">
+                    <div className="account-avatar account-avatar-sm">
+                      {currentUser.avatarUrl ? (
+                        <img src={currentUser.avatarUrl} alt={currentUser.name} />
+                      ) : (
+                        <span>{currentUser.name?.charAt(0)?.toUpperCase()}</span>
                       )}
-                    </p>
+                    </div>
+                    <div>
+                      <strong>{currentUser.name}</strong>
+                      <span className="dashboard-user-type">
+                        {currentUser.userType === "business" ? "Biznes" : "Individ"}
+                      </span>
+                    </div>
                   </div>
-                </div>
-
-                <p>Email: {currentUser.email}</p>
-                {currentUser.phone && <p>Telefoni: {currentUser.phone}</p>}
-                {currentUser.address && <p>Adresa: {currentUser.address}</p>}
-                <p>
-                  Status:{" "}
-                  <strong>
-                    {currentUser.isVerified ? "Verifikuar" : "Jo verifikuar"}
-                  </strong>
-                </p>
-                {!currentUser.isVerified && (
-                  <button
-                    type="button"
-                    className="button button-primary"
-                    disabled={authSubmitting}
-                    onClick={() => handleResendVerification(currentUser.email)}
-                  >
-                    Ridërgo email-in e verifikimit
-                  </button>
-                )}
-
-                <div className="account-actions">
-                  <button
-                    type="button"
-                    className="button button-secondary"
-                    onClick={() =>
-                      profileEditing ? setProfileEditing(false) : startProfileEdit()
-                    }
-                  >
-                    {profileEditing ? "Anulo" : "Edito profilin"}
-                  </button>
                   <button
                     type="button"
                     className="button button-secondary"
@@ -1101,177 +1067,309 @@ function App() {
                   </button>
                 </div>
 
-                {profileEditing && (
-                  <form onSubmit={handleProfileSubmit} className="profile-edit-form">
-                    <label>
-                      Foto e profilit
-                      <input type="file" accept="image/*" onChange={handleAvatarChange} />
-                    </label>
-                    {profileForm.avatarUrl && (
-                      <img
-                        src={profileForm.avatarUrl}
-                        alt="Parapamje e fotos"
-                        className="avatar-preview"
-                      />
-                    )}
-                    <label>
-                      Emri
-                      <input
-                        name="name"
-                        value={profileForm.name}
-                        onChange={handleProfileChange}
-                      />
-                    </label>
-                    <label>
-                      Telefoni
-                      <input
-                        name="phone"
-                        value={profileForm.phone}
-                        onChange={handleProfileChange}
-                        placeholder="+383 4X XXX XXX"
-                      />
-                    </label>
-                    <label>
-                      Adresa
-                      <input
-                        name="address"
-                        value={profileForm.address}
-                        onChange={handleProfileChange}
-                        placeholder="Qyteti, rruga"
-                      />
-                    </label>
-                    {currentUser.userType === "business" && (
-                      <label>
-                        Emri i kompanisë
-                        <input
-                          name="company"
-                          value={profileForm.company}
-                          onChange={handleProfileChange}
-                        />
-                      </label>
-                    )}
+                <div className="dashboard-body">
+                  <nav className="dashboard-sidebar">
                     <button
-                      type="submit"
-                      className="button button-primary"
-                      disabled={profileSubmitting}
+                      type="button"
+                      className={
+                        dashboardSection === "overview"
+                          ? "dashboard-nav-item active"
+                          : "dashboard-nav-item"
+                      }
+                      onClick={() => setDashboardSection("overview")}
                     >
-                      {profileSubmitting ? "Duke ruajtur..." : "Ruaj ndryshimet"}
+                      Përmbledhje
                     </button>
-                  </form>
-                )}
-
-                {profileMessage && (
-                  <p
-                    className={
-                      profileError ? "form-message form-message-error" : "form-message"
-                    }
-                  >
-                    {profileMessage}
-                  </p>
-                )}
-
-                <div className="post-form-card">
-                  <h4>Postoni ofertën tuaj</h4>
-                  <p>
-                    Pas verifikimit të email-it, mund të ngarkoni foto dhe
-                    informacion.
-                  </p>
-                  <form onSubmit={handlePostSubmit}>
-                    <label>
-                      Titulli i postimit
-                      <input
-                        name="title"
-                        value={postForm.title}
-                        onChange={handlePostChange}
-                        placeholder="P.sh. Apartament 2+1 në qendër"
-                      />
-                    </label>
-                    <label>
-                      Kategoria
-                      <select
-                        name="category"
-                        value={postForm.category}
-                        onChange={handlePostChange}
-                      >
-                        {categories.map((category) => (
-                          <option key={category} value={category}>
-                            {category}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      Lloji i ofertës
-                      <select
-                        name="type"
-                        value={postForm.type}
-                        onChange={handlePostChange}
-                      >
-                        <option value="Shitje">Shitje</option>
-                        <option value="Me qira">Me qira</option>
-                        <option value="Abonim mujor">Abonim mujor</option>
-                      </select>
-                    </label>
-                    <label>
-                      Përshkrimi
-                      <textarea
-                        name="description"
-                        value={postForm.description}
-                        onChange={handlePostChange}
-                        rows="4"
-                        placeholder="Përshkrimi i shërbimit ose pronës"
-                      />
-                    </label>
-                    <label>
-                      Çmimi
-                      <input
-                        name="price"
-                        value={postForm.price}
-                        onChange={handlePostChange}
-                        placeholder="P.sh. 1200€/muaj ose 45000€"
-                      />
-                    </label>
-                    <label>
-                      Fotot
-                      <input
-                        type="file"
-                        multiple
-                        onChange={handlePhotoChange}
-                      />
-                    </label>
-                    <button type="submit" className="button button-primary">
-                      Publiko ofertën
+                    <button
+                      type="button"
+                      className={
+                        dashboardSection === "profile"
+                          ? "dashboard-nav-item active"
+                          : "dashboard-nav-item"
+                      }
+                      onClick={openProfileSection}
+                    >
+                      Profili im
                     </button>
-                    {uploadMessage && (
-                      <p className="form-message">{uploadMessage}</p>
+                    <button
+                      type="button"
+                      className={
+                        dashboardSection === "posts"
+                          ? "dashboard-nav-item active"
+                          : "dashboard-nav-item"
+                      }
+                      onClick={() => setDashboardSection("posts")}
+                    >
+                      Postimet e mia
+                    </button>
+                  </nav>
+
+                  <div className="dashboard-content">
+                    {dashboardSection === "overview" && (
+                      <div className="dashboard-overview">
+                        <h3>Mirë se erdhe, {currentUser.name}</h3>
+                        <p>Email: {currentUser.email}</p>
+                        {currentUser.phone && <p>Telefoni: {currentUser.phone}</p>}
+                        {currentUser.address && <p>Adresa: {currentUser.address}</p>}
+                        {currentUser.company && <p>Kompania: {currentUser.company}</p>}
+                        <p>
+                          Status:{" "}
+                          <strong>
+                            {currentUser.isVerified ? "Verifikuar" : "Jo verifikuar"}
+                          </strong>
+                        </p>
+                        {!currentUser.isVerified && (
+                          <button
+                            type="button"
+                            className="button button-primary"
+                            disabled={authSubmitting}
+                            onClick={() => handleResendVerification(currentUser.email)}
+                          >
+                            Ridërgo email-in e verifikimit
+                          </button>
+                        )}
+                      </div>
                     )}
-                  </form>
-                </div>
 
-                <div className="posts-list">
-                  <h4>Postimet e mia</h4>
-                  {posts.filter((post) => post.author === currentUser.name)
-                    .length > 0 ? (
-                    posts
-                      .filter((post) => post.author === currentUser.name)
-                      .map((post) => (
-                        <article key={post.id} className="business-card">
-                          <div>
-                            <h4>{post.title}</h4>
-                            <p className="business-meta">
-                              {post.category} • {post.type}
-                            </p>
-                            <p>{post.description}</p>
-                            <p className="business-meta">Çmimi: {post.price}</p>
-                          </div>
-                        </article>
-                      ))
-                  ) : (
-                    <p>Nuk ka postime të regjistruara ende.</p>
-                  )}
+                    {dashboardSection === "profile" && (
+                      <div>
+                        <div className="dashboard-tabs">
+                          <button
+                            type="button"
+                            className={
+                              profileTab === "personal"
+                                ? "dashboard-tab active"
+                                : "dashboard-tab"
+                            }
+                            onClick={() => setProfileTab("personal")}
+                          >
+                            Informata Personale
+                          </button>
+                          <button
+                            type="button"
+                            className={
+                              profileTab === "contact"
+                                ? "dashboard-tab active"
+                                : "dashboard-tab"
+                            }
+                            onClick={() => setProfileTab("contact")}
+                          >
+                            Kontaktet
+                          </button>
+                          <button
+                            type="button"
+                            className={
+                              profileTab === "photo" ? "dashboard-tab active" : "dashboard-tab"
+                            }
+                            onClick={() => setProfileTab("photo")}
+                          >
+                            Foto
+                          </button>
+                        </div>
+
+                        <form onSubmit={handleProfileSubmit} className="profile-edit-form">
+                          {profileTab === "personal" && (
+                            <>
+                              <label>
+                                Emri
+                                <input
+                                  name="name"
+                                  value={profileForm.name}
+                                  onChange={handleProfileChange}
+                                />
+                              </label>
+                              <label>
+                                Lloji i llogarisë
+                                <input value={currentUser.userType} disabled />
+                              </label>
+                              {currentUser.userType === "business" && (
+                                <label>
+                                  Emri i kompanisë
+                                  <input
+                                    name="company"
+                                    value={profileForm.company}
+                                    onChange={handleProfileChange}
+                                  />
+                                </label>
+                              )}
+                            </>
+                          )}
+
+                          {profileTab === "contact" && (
+                            <>
+                              <label>
+                                Email
+                                <input value={currentUser.email} disabled />
+                              </label>
+                              <label>
+                                Telefoni
+                                <input
+                                  name="phone"
+                                  value={profileForm.phone}
+                                  onChange={handleProfileChange}
+                                  placeholder="+383 4X XXX XXX"
+                                />
+                              </label>
+                              <label>
+                                Adresa
+                                <input
+                                  name="address"
+                                  value={profileForm.address}
+                                  onChange={handleProfileChange}
+                                  placeholder="Qyteti, rruga"
+                                />
+                              </label>
+                            </>
+                          )}
+
+                          {profileTab === "photo" && (
+                            <>
+                              <div className="account-avatar account-avatar-lg">
+                                {profileForm.avatarUrl ? (
+                                  <img src={profileForm.avatarUrl} alt="Parapamje e fotos" />
+                                ) : (
+                                  <span>{currentUser.name?.charAt(0)?.toUpperCase()}</span>
+                                )}
+                              </div>
+                              <label>
+                                Foto e profilit
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={handleAvatarChange}
+                                />
+                              </label>
+                            </>
+                          )}
+
+                          <button
+                            type="submit"
+                            className="button button-primary"
+                            disabled={profileSubmitting}
+                          >
+                            {profileSubmitting ? "Duke ruajtur..." : "Ruaj ndryshimet"}
+                          </button>
+                        </form>
+
+                        {profileMessage && (
+                          <p
+                            className={
+                              profileError
+                                ? "form-message form-message-error"
+                                : "form-message"
+                            }
+                          >
+                            {profileMessage}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {dashboardSection === "posts" && (
+                      <div>
+                        <div className="post-form-card">
+                          <h4>Postoni ofertën tuaj</h4>
+                          <p>
+                            Pas verifikimit të email-it, mund të ngarkoni foto dhe
+                            informacion.
+                          </p>
+                          <form onSubmit={handlePostSubmit}>
+                            <label>
+                              Titulli i postimit
+                              <input
+                                name="title"
+                                value={postForm.title}
+                                onChange={handlePostChange}
+                                placeholder="P.sh. Apartament 2+1 në qendër"
+                              />
+                            </label>
+                            <label>
+                              Kategoria
+                              <select
+                                name="category"
+                                value={postForm.category}
+                                onChange={handlePostChange}
+                              >
+                                {categories.map((category) => (
+                                  <option key={category} value={category}>
+                                    {category}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <label>
+                              Lloji i ofertës
+                              <select
+                                name="type"
+                                value={postForm.type}
+                                onChange={handlePostChange}
+                              >
+                                <option value="Shitje">Shitje</option>
+                                <option value="Me qira">Me qira</option>
+                                <option value="Abonim mujor">Abonim mujor</option>
+                              </select>
+                            </label>
+                            <label>
+                              Përshkrimi
+                              <textarea
+                                name="description"
+                                value={postForm.description}
+                                onChange={handlePostChange}
+                                rows="4"
+                                placeholder="Përshkrimi i shërbimit ose pronës"
+                              />
+                            </label>
+                            <label>
+                              Çmimi
+                              <input
+                                name="price"
+                                value={postForm.price}
+                                onChange={handlePostChange}
+                                placeholder="P.sh. 1200€/muaj ose 45000€"
+                              />
+                            </label>
+                            <label>
+                              Fotot
+                              <input type="file" multiple onChange={handlePhotoChange} />
+                            </label>
+                            <button type="submit" className="button button-primary">
+                              Publiko ofertën
+                            </button>
+                            {uploadMessage && (
+                              <p className="form-message">{uploadMessage}</p>
+                            )}
+                          </form>
+                        </div>
+
+                        <div className="posts-list">
+                          <h4>Postimet e mia</h4>
+                          {posts.filter((post) => post.author === currentUser.name)
+                            .length > 0 ? (
+                            posts
+                              .filter((post) => post.author === currentUser.name)
+                              .map((post) => (
+                                <article key={post.id} className="business-card">
+                                  <div>
+                                    <h4>{post.title}</h4>
+                                    <p className="business-meta">
+                                      {post.category} • {post.type}
+                                    </p>
+                                    <p>{post.description}</p>
+                                    <p className="business-meta">Çmimi: {post.price}</p>
+                                  </div>
+                                </article>
+                              ))
+                          ) : (
+                            <p>Nuk ka postime të regjistruara ende.</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             ) : (
+              <div className="auth-grid">
               <div className="auth-card">
                 <div className="auth-tabs">
                   <a
@@ -1413,9 +1511,9 @@ function App() {
                   </button>
                 )}
               </div>
+              </div>
             )}
-          </div>
-        </section>
+          </section>
 
         ) : isCategoryPage ? (
           <section className="category-page container">
