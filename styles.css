@@ -455,10 +455,17 @@ img {
   margin: 0 0 1.5rem;
 }
 
+.auth-panel-section {
+  padding: 4rem 0;
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+}
+
 .auth-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2rem;
+  display: flex;
+  justify-content: center;
+  width: 100%;
 }
 
 .auth-card,
@@ -468,6 +475,17 @@ img {
   border: 1px solid rgba(17, 24, 39, 0.08);
   border-radius: 24px;
   padding: 1.75rem;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 26rem;
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.08);
+}
+
+.account-card {
+  width: 100%;
+  max-width: 44rem;
 }
 
 .auth-tabs {
@@ -511,9 +529,6 @@ img {
 }
 
 @media (max-width: 900px) {
-  .auth-grid {
-    grid-template-columns: 1fr;
-  }
   .category-grid,
   .feature-item {
     grid-template-columns: 1fr;

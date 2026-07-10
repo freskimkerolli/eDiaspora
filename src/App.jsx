@@ -619,6 +619,7 @@ function App() {
       </header>
 
       <main>
+        {!isVerifyPage && !isAuthPage && !isCategoryPage && (
         <section className="hero" id="home">
           <div className="container hero-content">
             <div>
@@ -713,9 +714,10 @@ function App() {
             </div>
           </div>
         </section>
+        )}
 
         {isVerifyPage ? (
-          <section className="auth container" id="verify">
+          <section className="auth-panel-section container" id="verify">
             <div className="verify-card">
               <h2>
                 {verifyStatus === "success"
@@ -737,18 +739,7 @@ function App() {
             </div>
           </section>
         ) : isAuthPage ? (
-          <section className="auth container" id="auth">
-            <div className="section-header">
-              <div>
-                <p className="eyebrow">Për bizneset</p>
-                <h2>Regjistrim dhe hyrje për ofruesit e shërbimeve</h2>
-                <p>
-                  Regjistrimi është falas për bizneset për tre muaj. Verifikimi i
-                  email-it është i nevojshëm për të postuar.
-                </p>
-              </div>
-            </div>
-
+          <section className="auth-panel-section container" id="auth">
             <div className="auth-grid">
               {currentUser ? (
               <div className="account-card">
