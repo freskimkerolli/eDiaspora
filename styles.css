@@ -529,7 +529,10 @@ img {
 .auth-card textarea,
 .post-form-card input,
 .post-form-card select,
-.post-form-card textarea {
+.post-form-card textarea,
+.profile-edit-form input,
+.profile-edit-form select,
+.profile-edit-form textarea {
   width: 100%;
   border: 1px solid rgba(17, 24, 39, 0.12);
   border-radius: 14px;
@@ -537,6 +540,90 @@ img {
   font: inherit;
   color: #111;
   background: #f9faf8;
+}
+
+.auth-panel-title {
+  margin: 0 0 0.75rem;
+  font-size: 1.5rem;
+  text-align: center;
+}
+
+.auth-panel-subtitle {
+  margin: 0 0 1.5rem;
+  color: #4b5563;
+  text-align: center;
+}
+
+.auth-panel-link {
+  display: block;
+  margin-top: 1rem;
+  text-align: center;
+  color: #4b5563;
+  font-size: 0.9rem;
+}
+
+.account-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.account-avatar {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #111;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.account-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.account-meta-line {
+  margin: 0.35rem 0 0;
+  color: #4b5563;
+}
+
+.account-actions {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: 1.25rem 0;
+}
+
+.profile-edit-form {
+  display: grid;
+  gap: 1rem;
+  margin: 1.25rem 0;
+  padding: 1.5rem;
+  border-radius: 18px;
+  background: #f9faf8;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+}
+
+.profile-edit-form label {
+  display: grid;
+  gap: 0.5rem;
+  color: #374151;
+  font-weight: 500;
+}
+
+.avatar-preview {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
 }
 
 .post-form-card label {

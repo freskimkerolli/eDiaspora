@@ -11,3 +11,14 @@ create table if not exists users (
 );
 
 create index if not exists users_verification_token_idx on users (verification_token);
+
+-- Profile fields
+alter table users add column if not exists phone text;
+alter table users add column if not exists address text;
+alter table users add column if not exists avatar_url text;
+
+-- Password reset
+alter table users add column if not exists reset_token text;
+alter table users add column if not exists reset_token_expires timestamptz;
+
+create index if not exists users_reset_token_idx on users (reset_token);

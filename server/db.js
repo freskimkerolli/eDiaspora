@@ -18,8 +18,13 @@ function mapRow(row) {
     passwordHash: row.password_hash,
     userType: row.user_type,
     company: row.company,
+    phone: row.phone,
+    address: row.address,
+    avatarUrl: row.avatar_url,
     isVerified: row.is_verified,
     verificationToken: row.verification_token,
+    resetToken: row.reset_token,
+    resetTokenExpires: row.reset_token_expires,
     createdAt: row.created_at,
   };
 }
@@ -35,6 +40,14 @@ export async function findUserByEmail(email) {
 export async function findUserByVerificationToken(token) {
   const { rows } = await pool.query(
     "SELECT * FROM users WHERE verification_token = $1",
+    [token],
+  );
+  return mapRow(rows[0]);
+}
+
+export async function findUserByResetToken(token) {
+  const { rows } = await pool.query(
+    "SELECT * FROM users WHERE reset_token = $1",
     [token],
   );
   return mapRow(rows[0]);
@@ -65,8 +78,13 @@ export async function updateUser(id, updates) {
     passwordHash: "password_hash",
     userType: "user_type",
     company: "company",
+    phone: "phone",
+    address: "address",
+    avatarUrl: "avatar_url",
     isVerified: "is_verified",
     verificationToken: "verification_token",
+    resetToken: "reset_token",
+    resetTokenExpires: "reset_token_expires",
   };
 
   const fields = [];

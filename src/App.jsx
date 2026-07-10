@@ -380,6 +380,28 @@ function App() {
   const [posts, setPosts] = useState(initialPosts);
   const [uploadMessage, setUploadMessage] = useState("");
 
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotMessage, setForgotMessage] = useState("");
+  const [forgotSubmitting, setForgotSubmitting] = useState(false);
+
+  const [resetForm, setResetForm] = useState({ password: "", confirmPassword: "" });
+  const [resetMessage, setResetMessage] = useState("");
+  const [resetError, setResetError] = useState(false);
+  const [resetSubmitting, setResetSubmitting] = useState(false);
+  const [resetDone, setResetDone] = useState(false);
+
+  const [profileEditing, setProfileEditing] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    name: "",
+    phone: "",
+    address: "",
+    company: "",
+    avatarUrl: "",
+  });
+  const [profileMessage, setProfileMessage] = useState("");
+  const [profileError, setProfileError] = useState(false);
+  const [profileSubmitting, setProfileSubmitting] = useState(false);
+
   const authHandleChange = (event) => {
     const { name, value } = event.target;
     setAuthForm((current) => ({ ...current, [name]: value }));
@@ -482,6 +504,161 @@ function App() {
     }
   };
 
+  const handleForgotPassword = async (event) => {
+    event.preventDefault();
+    setForgotSubmitting(true);
+    setForgotMessage("");
+    try {
+      const response = await fetch(`${API_URL}/api/forgot-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: forgotEmail }),
+      });
+      const data = await response.json();
+      setForgotMessage(data.message || data.error);
+    } catch (err) {
+      setForgotMessage("Nuk u arrit lidhja me serverin. Provoni përsëri.");
+    } finally {
+      setForgotSubmitting(false);
+    }
+  };
+
+  const handleResetFormChange = (event) => {
+    const { name, value } = event.target;
+    setResetForm((current) => ({ ...current, [name]: value }));
+  };
+
+  const handleResetPassword = async (event) => {
+    event.preventDefault();
+
+    if (resetForm.password.length < 6) {
+      setResetError(true);
+      setResetMessage("Fjalëkalimi duhet të ketë të paktën 6 shkronja.");
+      return;
+    }
+
+    if (resetForm.password !== resetForm.confirmPassword) {
+      setResetError(true);
+      setResetMessage("Fjalëkalimet nuk përputhen.");
+      return;
+    }
+
+    const token = new URLSearchParams(window.location.search).get("token");
+    setResetSubmitting(true);
+    setResetMessage("");
+    try {
+      const response = await fetch(`${API_URL}/api/reset-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, password: resetForm.password }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setResetError(true);
+        setResetMessage(data.error);
+        return;
+      }
+
+      setResetError(false);
+      setResetMessage(data.message);
+      setResetDone(true);
+    } catch (err) {
+      setResetError(true);
+      setResetMessage("Nuk u arrit lidhja me serverin. Provoni përsëri.");
+    } finally {
+      setResetSubmitting(false);
+    }
+  };
+
+  const startProfileEdit = () => {
+    setProfileForm({
+      name: currentUser.name || "",
+      phone: currentUser.phone || "",
+      address: currentUser.address || "",
+      company: currentUser.company || "",
+      avatarUrl: currentUser.avatarUrl || "",
+    });
+    setProfileMessage("");
+    setProfileEditing(true);
+  };
+
+  const handleProfileChange = (event) => {
+    const { name, value } = event.target;
+    setProfileForm((current) => ({ ...current, [name]: value }));
+  };
+
+  const resizeImageFile = (file, maxSize = 320) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(reader.error);
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = reject;
+        img.onload = () => {
+          let { width, height } = img;
+          if (width > height && width > maxSize) {
+            height = Math.round((height * maxSize) / width);
+            width = maxSize;
+          } else if (height >= width && height > maxSize) {
+            width = Math.round((width * maxSize) / height);
+            height = maxSize;
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL("image/jpeg", 0.85));
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+  const handleAvatarChange = async (event) => {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+
+    try {
+      const dataUrl = await resizeImageFile(file);
+      setProfileForm((current) => ({ ...current, avatarUrl: dataUrl }));
+    } catch (err) {
+      setProfileError(true);
+      setProfileMessage("Nuk u arrit ngarkimi i fotos. Provo një foto tjetër.");
+    }
+  };
+
+  const handleProfileSubmit = async (event) => {
+    event.preventDefault();
+    setProfileSubmitting(true);
+    setProfileMessage("");
+    try {
+      const response = await fetch(`${API_URL}/api/profile`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: currentUser.email, ...profileForm }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setProfileError(true);
+        setProfileMessage(data.error || "Përditësimi dështoi.");
+        return;
+      }
+
+      setCurrentUser(data.user);
+      window.localStorage.setItem("eDiasporaUser", JSON.stringify(data.user));
+      setProfileError(false);
+      setProfileMessage(data.message);
+      setProfileEditing(false);
+    } catch (err) {
+      setProfileError(true);
+      setProfileMessage("Nuk u arrit lidhja me serverin. Provoni përsëri.");
+    } finally {
+      setProfileSubmitting(false);
+    }
+  };
+
   const handlePostChange = (event) => {
     const { name, value } = event.target;
     setPostForm((current) => ({ ...current, [name]: value }));
@@ -546,6 +723,8 @@ function App() {
   const isAuthPage =
     route === "/auth" || route === "/login" || route === "/register";
   const isVerifyPage = route === "/verify";
+  const isForgotPasswordPage = route === "/forgot-password";
+  const isResetPasswordPage = route === "/reset-password";
   const authMode = route === "/register" ? "register" : "login";
 
   const handleNavigate = (path) => {
@@ -645,7 +824,11 @@ function App() {
       </header>
 
       <main>
-        {!isVerifyPage && !isAuthPage && !isCategoryPage && (
+        {!isVerifyPage &&
+          !isAuthPage &&
+          !isCategoryPage &&
+          !isForgotPasswordPage &&
+          !isResetPasswordPage && (
         <section className="hero" id="home">
           <div className="container hero-content">
             <div>
@@ -764,17 +947,124 @@ function App() {
               )}
             </div>
           </section>
+        ) : isForgotPasswordPage ? (
+          <section className="auth-panel-section container" id="forgot-password">
+            <div className="auth-card">
+              <h2 className="auth-panel-title">Harrove fjalëkalimin?</h2>
+              <p className="auth-panel-subtitle">
+                Vendos email-in tënd dhe do të të dërgojmë një link për të
+                rivendosur fjalëkalimin.
+              </p>
+              <form onSubmit={handleForgotPassword} className="registration-form">
+                <label>
+                  Email
+                  <input
+                    type="email"
+                    name="email"
+                    value={forgotEmail}
+                    onChange={(event) => setForgotEmail(event.target.value)}
+                    placeholder="email@shembull.com"
+                  />
+                </label>
+                <button
+                  type="submit"
+                  className="button button-primary"
+                  disabled={forgotSubmitting}
+                >
+                  {forgotSubmitting ? "Duke dërguar..." : "Dërgo linkun"}
+                </button>
+              </form>
+              {forgotMessage && <p className="form-message">{forgotMessage}</p>}
+              <a href="/login" className="auth-panel-link">
+                Kthehu te hyrja
+              </a>
+            </div>
+          </section>
+        ) : isResetPasswordPage ? (
+          <section className="auth-panel-section container" id="reset-password">
+            <div className="auth-card">
+              <h2 className="auth-panel-title">Rivendos fjalëkalimin</h2>
+              {resetDone ? (
+                <>
+                  <p className="auth-panel-subtitle">{resetMessage}</p>
+                  <a href="/login" className="button button-primary">
+                    Shko te Hyrja
+                  </a>
+                </>
+              ) : (
+                <>
+                  <form onSubmit={handleResetPassword} className="registration-form">
+                    <label>
+                      Fjalëkalimi i ri
+                      <input
+                        type="password"
+                        name="password"
+                        value={resetForm.password}
+                        onChange={handleResetFormChange}
+                        placeholder="Të paktën 6 shkronja"
+                      />
+                    </label>
+                    <label>
+                      Përsërit fjalëkalimin
+                      <input
+                        type="password"
+                        name="confirmPassword"
+                        value={resetForm.confirmPassword}
+                        onChange={handleResetFormChange}
+                        placeholder="Përsërit fjalëkalimin"
+                      />
+                    </label>
+                    <button
+                      type="submit"
+                      className="button button-primary"
+                      disabled={resetSubmitting}
+                    >
+                      {resetSubmitting ? "Duke ruajtur..." : "Ruaj fjalëkalimin"}
+                    </button>
+                  </form>
+                  {resetMessage && (
+                    <p
+                      className={
+                        resetError ? "form-message form-message-error" : "form-message"
+                      }
+                    >
+                      {resetMessage}
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          </section>
         ) : isAuthPage ? (
           <section className="auth-panel-section container" id="auth">
             <div className="auth-grid">
               {currentUser ? (
               <div className="account-card">
-                <h3>Miresevini, {currentUser.name}</h3>
-                <p>
-                  Llogaria juaj: <strong>{currentUser.userType}</strong> |
-                  Kompania: <strong>{currentUser.company}</strong>
-                </p>
+                <div className="account-header">
+                  <div className="account-avatar">
+                    {currentUser.avatarUrl ? (
+                      <img src={currentUser.avatarUrl} alt={currentUser.name} />
+                    ) : (
+                      <span>{currentUser.name?.charAt(0)?.toUpperCase()}</span>
+                    )}
+                  </div>
+                  <div>
+                    <h3>Miresevini, {currentUser.name}</h3>
+                    <p className="account-meta-line">
+                      Llogaria juaj: <strong>{currentUser.userType}</strong>
+                      {currentUser.company && (
+                        <>
+                          {" "}
+                          | Kompania: <strong>{currentUser.company}</strong>
+                        </>
+                      )}
+                    </p>
+                  </div>
+                </div>
+
                 <p>Email: {currentUser.email}</p>
+                {currentUser.phone && <p>Telefoni: {currentUser.phone}</p>}
+                {currentUser.address && <p>Adresa: {currentUser.address}</p>}
                 <p>
                   Status:{" "}
                   <strong>
@@ -791,13 +1081,94 @@ function App() {
                     Ridërgo email-in e verifikimit
                   </button>
                 )}
-                <button
-                  type="button"
-                  className="button button-secondary"
-                  onClick={handleLogout}
-                >
-                  Dil
-                </button>
+
+                <div className="account-actions">
+                  <button
+                    type="button"
+                    className="button button-secondary"
+                    onClick={() =>
+                      profileEditing ? setProfileEditing(false) : startProfileEdit()
+                    }
+                  >
+                    {profileEditing ? "Anulo" : "Edito profilin"}
+                  </button>
+                  <button
+                    type="button"
+                    className="button button-secondary"
+                    onClick={handleLogout}
+                  >
+                    Dil
+                  </button>
+                </div>
+
+                {profileEditing && (
+                  <form onSubmit={handleProfileSubmit} className="profile-edit-form">
+                    <label>
+                      Foto e profilit
+                      <input type="file" accept="image/*" onChange={handleAvatarChange} />
+                    </label>
+                    {profileForm.avatarUrl && (
+                      <img
+                        src={profileForm.avatarUrl}
+                        alt="Parapamje e fotos"
+                        className="avatar-preview"
+                      />
+                    )}
+                    <label>
+                      Emri
+                      <input
+                        name="name"
+                        value={profileForm.name}
+                        onChange={handleProfileChange}
+                      />
+                    </label>
+                    <label>
+                      Telefoni
+                      <input
+                        name="phone"
+                        value={profileForm.phone}
+                        onChange={handleProfileChange}
+                        placeholder="+383 4X XXX XXX"
+                      />
+                    </label>
+                    <label>
+                      Adresa
+                      <input
+                        name="address"
+                        value={profileForm.address}
+                        onChange={handleProfileChange}
+                        placeholder="Qyteti, rruga"
+                      />
+                    </label>
+                    {currentUser.userType === "business" && (
+                      <label>
+                        Emri i kompanisë
+                        <input
+                          name="company"
+                          value={profileForm.company}
+                          onChange={handleProfileChange}
+                        />
+                      </label>
+                    )}
+                    <button
+                      type="submit"
+                      className="button button-primary"
+                      disabled={profileSubmitting}
+                    >
+                      {profileSubmitting ? "Duke ruajtur..." : "Ruaj ndryshimet"}
+                    </button>
+                  </form>
+                )}
+
+                {profileMessage && (
+                  <p
+                    className={
+                      profileError ? "form-message form-message-error" : "form-message"
+                    }
+                  >
+                    {profileMessage}
+                  </p>
+                )}
 
                 <div className="post-form-card">
                   <h4>Postoni ofertën tuaj</h4>
@@ -1015,6 +1386,9 @@ function App() {
                     >
                       {authSubmitting ? "Duke u kyçur..." : "Hyni"}
                     </button>
+                    <a href="/forgot-password" className="auth-panel-link">
+                      Harrove fjalëkalimin?
+                    </a>
                   </form>
                 )}
 
