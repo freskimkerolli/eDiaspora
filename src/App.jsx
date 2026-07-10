@@ -351,6 +351,7 @@ const initialPosts = [
 
 function App() {
   const [route, setRoute] = useState(getInitialRoute());
+  const [menuOpen, setMenuOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = window.localStorage.getItem("eDiasporaUser");
     return saved ? JSON.parse(saved) : null;
@@ -603,15 +604,40 @@ function App() {
               <span className="logo-e">e</span>Diaspora
             </span>
           </a>
-          <nav className="main-nav">
-            <a href="#categories">Kategoritë</a>
-            <a href="#testimonials" className="button button-secondary">
+          <button
+            type="button"
+            className="nav-toggle"
+            aria-label={menuOpen ? "Mbyll menynë" : "Hap menynë"}
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((current) => !current)}
+          >
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+          <nav className={`main-nav ${menuOpen ? "main-nav-open" : ""}`}>
+            <a href="#categories" onClick={() => setMenuOpen(false)}>
+              Kategoritë
+            </a>
+            <a
+              href="#testimonials"
+              className="button button-secondary"
+              onClick={() => setMenuOpen(false)}
+            >
               Përshtypjet
             </a>
-            <a href="/login" className="button button-secondary">
+            <a
+              href="/login"
+              className="button button-secondary"
+              onClick={() => setMenuOpen(false)}
+            >
               Hyni
             </a>
-            <a href="/register" className="button button-primary">
+            <a
+              href="/register"
+              className="button button-primary"
+              onClick={() => setMenuOpen(false)}
+            >
               Regjistrohu
             </a>
           </nav>
