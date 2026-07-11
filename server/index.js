@@ -15,9 +15,23 @@ import { sendVerificationEmail, sendPasswordResetEmail } from "./mailer.js";
 const app = express();
 const PORT = process.env.PORT || 3001;
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || FRONTEND_URL)
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 const MAX_AVATAR_LENGTH = 2_000_000; // ~1.5MB image as base64
 
-app.use(cors({ origin: FRONTEND_URL }));
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+  }),
+);
 app.use(express.json({ limit: "3mb" }));
 
 function publicUser(user) {
