@@ -61,7 +61,6 @@ const categorySections = [
       "Përkthyes të licencuar",
       "Trashëgimi",
       "Kontrata",
-      "Regjistrim kompanie",
       "Çështje pronësore",
     ],
   },
