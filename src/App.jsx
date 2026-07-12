@@ -55,14 +55,14 @@ const categorySections = [
     title: "Mirëmbajtje",
     emoji: "🔧",
     items: [
-      "Pastrim shtëpie",
-      "Pastrim pas ndërtimit",
-      "Pastrim oborri",
+      "Mirëmbajtje shtëpie",
+      "Mirëmbajtje pas ndërtimit",
+      "Mirëmbajtje oborri",
       "Kopshtari",
       "Krasitje",
       "Mirëmbajtje pishinash",
       "Dezinfektim",
-      "Deratizim",
+      "Interier",
     ],
   },
   {
@@ -257,6 +257,8 @@ const renderFlag = (code) => {
 const slugify = (value) =>
   value
     .toLowerCase()
+    .replace(/ë/g, "e")
+    .replace(/ç/g, "c")
     .replace(/&/g, "and")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
