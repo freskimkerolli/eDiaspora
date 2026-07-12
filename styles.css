@@ -550,6 +550,25 @@ img {
   border: 1px solid rgba(17, 24, 39, 0.08);
 }
 
+.completed-works-row {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+
+.completed-work-card {
+  flex: 0 0 240px;
+  padding: 1rem 1.15rem;
+  border-radius: 18px;
+  background: #f9faf8;
+}
+
+.completed-work-card .completed-work-preview img {
+  width: 68px;
+  height: 68px;
+}
+
 .auth-card input,
 .auth-card select,
 .auth-card textarea,

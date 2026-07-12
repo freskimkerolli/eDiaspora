@@ -1519,24 +1519,24 @@ function App() {
                           </form>
                         </div>
 
-                        <div className="posts-list">
+                        <div className="completed-works-list">
                           <h4>Punët e kryera</h4>
                           {completedWorks.filter((work) => work.author === currentUser.name)
                             .length > 0 ? (
-                            completedWorks
-                              .filter((work) => work.author === currentUser.name)
-                              .map((work) => (
-                                <article key={work.id} className="business-card">
-                                  <div>
+                            <div className="completed-works-row">
+                              {completedWorks
+                                .filter((work) => work.author === currentUser.name)
+                                .map((work) => (
+                                  <article key={work.id} className="completed-work-card">
                                     <div className="completed-work-preview">
                                       {work.photos.map((photo, index) => (
                                         <img key={index} src={photo} alt="Foto e punës" />
                                       ))}
                                     </div>
                                     <p>{work.description}</p>
-                                  </div>
-                                </article>
-                              ))
+                                  </article>
+                                ))}
+                            </div>
                           ) : (
                             <p>Nuk ka punë të kryera të shtuara ende.</p>
                           )}
