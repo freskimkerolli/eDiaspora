@@ -727,6 +727,8 @@ function App() {
   const isResetPasswordPage = route === "/reset-password";
   const authMode = route === "/register" ? "register" : "login";
 
+  const [pendingScroll, setPendingScroll] = useState(null);
+
   const handleNavigate = (path) => {
     if (path === route) return;
     window.history.pushState(null, "", path);
@@ -738,11 +740,31 @@ function App() {
     handleNavigate(path);
   };
 
+  const handleSectionLinkClick = (sectionId) => (event) => {
+    event.preventDefault();
+    setMenuOpen(false);
+    if (route !== "/") {
+      setPendingScroll(sectionId);
+      handleNavigate("/");
+      return;
+    }
+    document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth" });
+  };
+
   useEffect(() => {
     const onPopState = () => setRoute(getInitialRoute());
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
+
+  useEffect(() => {
+    if (!pendingScroll || route !== "/") return;
+    const id = pendingScroll;
+    setPendingScroll(null);
+    requestAnimationFrame(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+    });
+  }, [route, pendingScroll]);
 
   useEffect(() => {
     if (!isVerifyPage) return;
@@ -770,7 +792,7 @@ function App() {
     <div className="app-shell">
       <header className="site-header">
         <div className="container header-inner">
-          <a href="#home" className="logo">
+          <a href="/" className="logo" onClick={handleLinkClick("/")}>
             <svg
               className="logo-mark"
               viewBox="0 0 98 98"
@@ -804,13 +826,13 @@ function App() {
             >
               Ballina
             </a>
-            <a href="#categories" onClick={() => setMenuOpen(false)}>
+            <a href="/#categories" onClick={handleSectionLinkClick("categories")}>
               Kategoritë
             </a>
-            <a href="#about" onClick={() => setMenuOpen(false)}>
+            <a href="/#about" onClick={handleSectionLinkClick("about")}>
               Rreth nesh
             </a>
-            <a href="#testimonials" onClick={() => setMenuOpen(false)}>
+            <a href="/#testimonials" onClick={handleSectionLinkClick("testimonials")}>
               Përshtypjet
             </a>
             <span className="main-nav-divider" aria-hidden="true"></span>
@@ -819,7 +841,7 @@ function App() {
               className="button button-secondary"
               onClick={() => setMenuOpen(false)}
             >
-              Hyni
+              Kyçu
             </a>
             <a
               href="/register"
@@ -1389,7 +1411,7 @@ function App() {
                         : "button button-secondary"
                     }
                   >
-                    Hyni
+                    Kyçu
                   </a>
                   <a
                     href="/register"
@@ -1491,7 +1513,7 @@ function App() {
                       className="button button-primary"
                       disabled={authSubmitting}
                     >
-                      {authSubmitting ? "Duke u kyçur..." : "Hyni"}
+                      {authSubmitting ? "Duke u kyçur..." : "Kyçu"}
                     </button>
                     <a href="/forgot-password" className="auth-panel-link">
                       Harrove fjalëkalimin?
