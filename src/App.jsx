@@ -106,29 +106,6 @@ const categorySections = [
     ],
   },
   {
-    title: "Transport & Logjistikë",
-    emoji: "📦",
-    items: [
-      "Transport mallrash",
-      "Zhvendosje",
-      "Korrier",
-      "Doganë",
-      "Magazinim",
-    ],
-  },
-  {
-    title: "Media",
-    emoji: "📸",
-    items: [
-      "Fotografë",
-      "Videografë",
-      "Drone",
-      "Dizajn grafik",
-      "Marketing",
-      "Menaxhim rrjetesh sociale",
-    ],
-  },
-  {
     title: "Teknologji",
     emoji: "💻",
     items: [
@@ -141,15 +118,19 @@ const categorySections = [
     ],
   },
   {
-    title: "Evente",
+    title: "Evente & Media",
     emoji: "🎉",
     items: [
-      "Salla dasmash",
-      "Catering",
+      "Sallat e dasmave",
+      "Fotografë",
+      "Videografë",
+      "Drone",
       "DJ",
-      "Muzikantë",
       "Dekorime",
       "Organizim eventesh",
+      "Catering",
+      "Qira pajisjesh",
+      "Studio audio/video",
     ],
   },
 ];
@@ -1591,7 +1572,7 @@ function App() {
                       onClick={handleLinkClick(`/${slugify(section.title)}`)}
                       className="button button-outline"
                     >
-                      Shiko më shumë
+                      Shiko kategoritë
                     </a>
                   </article>
                 ))}
