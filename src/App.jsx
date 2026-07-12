@@ -25,12 +25,8 @@ const categorySections = [
       "Arkitektë",
       "Inxhinierë",
       "Mbikëqyrje punimesh",
-      "Renovime",
-      "Fasada",
-      "Kulme",
       "Izolim",
-      "Instalime elektrike",
-      "Instalime hidraulike",
+      "Instalime elektrike & hidraulike",
     ],
   },
   {
