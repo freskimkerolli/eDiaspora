@@ -38,7 +38,6 @@ const categorySections = [
       "Kopshtari",
       "Krasitje",
       "Mirëmbajtje pishinash",
-      "Interier",
     ],
   },
   {
