@@ -795,16 +795,25 @@ function App() {
             <span></span>
           </button>
           <nav className={`main-nav ${menuOpen ? "main-nav-open" : ""}`}>
+            <a
+              href="/"
+              onClick={(event) => {
+                handleLinkClick("/")(event);
+                setMenuOpen(false);
+              }}
+            >
+              Ballina
+            </a>
             <a href="#categories" onClick={() => setMenuOpen(false)}>
               Kategoritë
             </a>
-            <a
-              href="#testimonials"
-              className="button button-secondary"
-              onClick={() => setMenuOpen(false)}
-            >
+            <a href="#about" onClick={() => setMenuOpen(false)}>
+              Rreth nesh
+            </a>
+            <a href="#testimonials" onClick={() => setMenuOpen(false)}>
               Përshtypjet
             </a>
+            <span className="main-nav-divider" aria-hidden="true"></span>
             <a
               href="/login"
               className="button button-secondary"

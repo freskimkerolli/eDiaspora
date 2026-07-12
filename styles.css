@@ -96,10 +96,21 @@ img {
   align-items: center;
 }
 
-.main-nav a {
+.main-nav a:not(.button) {
   color: #374151;
   text-decoration: none;
   font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+.main-nav a:not(.button):hover {
+  color: #111;
+}
+
+.main-nav-divider {
+  width: 1px;
+  height: 22px;
+  background: rgba(17, 24, 39, 0.14);
 }
 
 .button {
@@ -831,6 +842,10 @@ img {
   .main-nav a:not(.button) {
     padding: 0.5rem 0;
     text-align: center;
+  }
+
+  .main-nav-divider {
+    display: none;
   }
 
   .dashboard-body {
