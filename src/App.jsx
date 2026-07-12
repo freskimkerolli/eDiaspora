@@ -30,23 +30,7 @@ const categorySections = [
     ],
   },
   {
-    title: "Interier",
-    emoji: "🛋",
-    items: [
-      "Mobilieri me porosi",
-      "Kuzhina",
-      "Garderoba",
-      "Dyer",
-      "Dritare",
-      "Parket",
-      "Pllaka",
-      "Dekor",
-      "Ndriçim",
-      "Dizajn interieri",
-    ],
-  },
-  {
-    title: "Mirëmbajtje",
+    title: "Mirëmbajtje & Interier",
     emoji: "🔧",
     items: [
       "Mirëmbajtje shtëpie",
@@ -303,7 +287,7 @@ const initialPosts = [
     author: "Driton Rama",
     userType: "business",
     title: "Renovim kuzhine dhe garderobash",
-    category: "Interier",
+    category: "Mirëmbajtje & Interier",
     type: "Abonim mujor",
     description: "Mobilieri me porosi, dizajn modern për shtëpinë tuaj.",
     price: "800€",
