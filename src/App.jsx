@@ -56,12 +56,10 @@ const categorySections = [
     emoji: "🔧",
     items: [
       "Mirëmbajtje shtëpie",
-      "Mirëmbajtje pas ndërtimit",
       "Mirëmbajtje oborri",
       "Kopshtari",
       "Krasitje",
       "Mirëmbajtje pishinash",
-      "Dezinfektim",
       "Interier",
     ],
   },
