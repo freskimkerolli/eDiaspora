@@ -91,15 +91,11 @@ const categorySections = [
     emoji: "🎉",
     items: [
       "Sallat e dasmave",
-      "Fotografë",
-      "Videografë",
-      "Drone",
+      "Fotografë & Videografë",
       "DJ",
       "Dekorime",
       "Organizim eventesh",
       "Catering",
-      "Qira pajisjesh",
-      "Studio audio/video",
     ],
   },
 ];
