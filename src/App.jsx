@@ -7,16 +7,14 @@ const categorySections = [
     title: "Prona",
     emoji: "🏠",
     items: [
-      "Blerje apartamentesh",
+      "Banesa",
       "Shtëpi",
       "Vila",
       "Toka",
       "Lokale afariste",
       "Objekte industriale",
-      "Dhënie me qira",
       "Menaxhim pronash",
       "Vlerësim i pronës",
-      "Inspektim para blerjes",
     ],
   },
   {
