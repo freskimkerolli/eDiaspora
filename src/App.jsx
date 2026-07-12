@@ -70,9 +70,7 @@ const categorySections = [
     items: [
       "Kontabilistë",
       "Konsulentë tatimorë",
-      "Kredi",
       "Sigurime",
-      "Investime",
       "Këmbim valutor",
     ],
   },
