@@ -535,6 +535,21 @@ img {
   gap: 1rem;
 }
 
+.completed-work-preview {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.completed-work-preview img {
+  width: 100px;
+  height: 100px;
+  object-fit: cover;
+  border-radius: 14px;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+}
+
 .auth-card input,
 .auth-card select,
 .auth-card textarea,

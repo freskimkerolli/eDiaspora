@@ -320,6 +320,8 @@ function App() {
   const [postForm, setPostForm] = useState({
     title: "",
     category: categories[0],
+    subcategory: categorySections[0].items[0],
+    customSubcategory: "",
     type: "Shitje",
     description: "",
     price: "",
@@ -327,6 +329,13 @@ function App() {
   });
   const [posts, setPosts] = useState(initialPosts);
   const [uploadMessage, setUploadMessage] = useState("");
+
+  const [completedWorkForm, setCompletedWorkForm] = useState({
+    description: "",
+    photos: [],
+  });
+  const [completedWorks, setCompletedWorks] = useState([]);
+  const [completedWorkMessage, setCompletedWorkMessage] = useState("");
 
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotMessage, setForgotMessage] = useState("");
@@ -577,6 +586,52 @@ function App() {
     }
   };
 
+  const handleCompletedWorkChange = (event) => {
+    const { name, value } = event.target;
+    setCompletedWorkForm((current) => ({ ...current, [name]: value }));
+  };
+
+  const handleCompletedWorkPhotosChange = async (event) => {
+    const files = Array.from(event.target.files || []).slice(0, 3);
+    if (files.length === 0) return;
+
+    try {
+      const dataUrls = await Promise.all(files.map((file) => resizeImageFile(file)));
+      setCompletedWorkForm((current) => ({ ...current, photos: dataUrls }));
+    } catch (err) {
+      setCompletedWorkMessage("Nuk u arrit ngarkimi i fotove. Provo përsëri.");
+    }
+  };
+
+  const handleCompletedWorkSubmit = (event) => {
+    event.preventDefault();
+    if (!currentUser) {
+      setCompletedWorkMessage("Ju duhet të hyni për të postuar.");
+      return;
+    }
+
+    if (!currentUser.isVerified) {
+      setCompletedWorkMessage("Ju lutemi verifikoni email-in para se të publikoni.");
+      return;
+    }
+
+    if (!completedWorkForm.description || completedWorkForm.photos.length === 0) {
+      setCompletedWorkMessage("Shtoni të paktën një foto dhe përshkrimin e punës.");
+      return;
+    }
+
+    const newWork = {
+      id: completedWorks.length + 1,
+      author: currentUser.name,
+      description: completedWorkForm.description,
+      photos: completedWorkForm.photos,
+    };
+
+    setCompletedWorks((current) => [newWork, ...current]);
+    setCompletedWorkForm({ description: "", photos: [] });
+    setCompletedWorkMessage("Puna e kryer u shtua me sukses.");
+  };
+
   const handleProfileSubmit = async (event) => {
     event.preventDefault();
     setProfileSubmitting(true);
@@ -609,11 +664,29 @@ function App() {
 
   const handlePostChange = (event) => {
     const { name, value } = event.target;
-    setPostForm((current) => ({ ...current, [name]: value }));
+    setPostForm((current) => {
+      if (name === "category") {
+        const section = categorySections.find((item) => item.title === value);
+        const firstSubcategory =
+          section && section.items.length > 0 ? section.items[0] : "Tjetër";
+        return {
+          ...current,
+          category: value,
+          subcategory: firstSubcategory,
+          customSubcategory: "",
+        };
+      }
+      if (name === "subcategory" && value !== "Tjetër") {
+        return { ...current, subcategory: value, customSubcategory: "" };
+      }
+      return { ...current, [name]: value };
+    });
   };
 
   const handlePhotoChange = (event) => {
-    const files = Array.from(event.target.files || []).map((file) => file.name);
+    const files = Array.from(event.target.files || [])
+      .slice(0, 3)
+      .map((file) => file.name);
     setPostForm((current) => ({ ...current, photos: files }));
   };
 
@@ -634,18 +707,32 @@ function App() {
       return;
     }
 
+    if (postForm.subcategory === "Tjetër" && !postForm.customSubcategory) {
+      setUploadMessage("Ju lutemi shkruani nënkategorinë tuaj.");
+      return;
+    }
+
+    const resolvedSubcategory =
+      postForm.subcategory === "Tjetër"
+        ? postForm.customSubcategory
+        : postForm.subcategory;
+
     const newPost = {
       id: posts.length + 1,
       author: currentUser.name,
       userType: currentUser.userType,
       clicks: 0,
       ...postForm,
+      subcategory: resolvedSubcategory,
     };
+    delete newPost.customSubcategory;
 
     setPosts((current) => [newPost, ...current]);
     setPostForm({
       title: "",
       category: categories[0],
+      subcategory: categorySections[0].items[0],
+      customSubcategory: "",
       type: "Shitje",
       description: "",
       price: "",
@@ -1079,7 +1166,18 @@ function App() {
                       }
                       onClick={() => setDashboardSection("posts")}
                     >
-                      Postimet e mia
+                      Postim i ri
+                    </button>
+                    <button
+                      type="button"
+                      className={
+                        dashboardSection === "completed-works"
+                          ? "dashboard-nav-item active"
+                          : "dashboard-nav-item"
+                      }
+                      onClick={() => setDashboardSection("completed-works")}
+                    >
+                      Punët e kryera
                     </button>
                   </nav>
 
@@ -1277,6 +1375,36 @@ function App() {
                               </select>
                             </label>
                             <label>
+                              Nënkategoria
+                              <select
+                                name="subcategory"
+                                value={postForm.subcategory}
+                                onChange={handlePostChange}
+                              >
+                                {(
+                                  categorySections.find(
+                                    (section) => section.title === postForm.category,
+                                  )?.items || []
+                                ).map((item) => (
+                                  <option key={item} value={item}>
+                                    {item}
+                                  </option>
+                                ))}
+                                <option value="Tjetër">Tjetër</option>
+                              </select>
+                            </label>
+                            {postForm.subcategory === "Tjetër" && (
+                              <label>
+                                Specifiko nënkategorinë
+                                <input
+                                  name="customSubcategory"
+                                  value={postForm.customSubcategory}
+                                  onChange={handlePostChange}
+                                  placeholder="Shkruaj nënkategorinë tënde"
+                                />
+                              </label>
+                            )}
+                            <label>
                               Lloji i ofertës
                               <select
                                 name="type"
@@ -1308,8 +1436,13 @@ function App() {
                               />
                             </label>
                             <label>
-                              Fotot
-                              <input type="file" multiple onChange={handlePhotoChange} />
+                              Fotot (maksimumi 3)
+                              <input
+                                type="file"
+                                multiple
+                                accept="image/*"
+                                onChange={handlePhotoChange}
+                              />
                             </label>
                             <button type="submit" className="button button-primary">
                               Publiko ofertën
@@ -1331,7 +1464,7 @@ function App() {
                                   <div>
                                     <h4>{post.title}</h4>
                                     <p className="business-meta">
-                                      {post.category} • {post.type}
+                                      {post.category} • {post.subcategory} • {post.type}
                                     </p>
                                     <p>{post.description}</p>
                                     <p className="business-meta">Çmimi: {post.price}</p>
@@ -1340,6 +1473,72 @@ function App() {
                               ))
                           ) : (
                             <p>Nuk ka postime të regjistruara ende.</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {dashboardSection === "completed-works" && (
+                      <div>
+                        <div className="post-form-card">
+                          <h4>Shto një punë të kryer</h4>
+                          <p>Ngarkoni deri në 3 foto dhe shpjegoni punën e kryer.</p>
+                          <form onSubmit={handleCompletedWorkSubmit}>
+                            <label>
+                              Fotot (maksimumi 3)
+                              <input
+                                type="file"
+                                multiple
+                                accept="image/*"
+                                onChange={handleCompletedWorkPhotosChange}
+                              />
+                            </label>
+                            {completedWorkForm.photos.length > 0 && (
+                              <div className="completed-work-preview">
+                                {completedWorkForm.photos.map((photo, index) => (
+                                  <img key={index} src={photo} alt="Parapamje e punës" />
+                                ))}
+                              </div>
+                            )}
+                            <label>
+                              Përshkrimi
+                              <textarea
+                                name="description"
+                                value={completedWorkForm.description}
+                                onChange={handleCompletedWorkChange}
+                                rows="4"
+                                placeholder="Shpjegoni punën e kryer"
+                              />
+                            </label>
+                            <button type="submit" className="button button-primary">
+                              Publiko punën
+                            </button>
+                            {completedWorkMessage && (
+                              <p className="form-message">{completedWorkMessage}</p>
+                            )}
+                          </form>
+                        </div>
+
+                        <div className="posts-list">
+                          <h4>Punët e kryera</h4>
+                          {completedWorks.filter((work) => work.author === currentUser.name)
+                            .length > 0 ? (
+                            completedWorks
+                              .filter((work) => work.author === currentUser.name)
+                              .map((work) => (
+                                <article key={work.id} className="business-card">
+                                  <div>
+                                    <div className="completed-work-preview">
+                                      {work.photos.map((photo, index) => (
+                                        <img key={index} src={photo} alt="Foto e punës" />
+                                      ))}
+                                    </div>
+                                    <p>{work.description}</p>
+                                  </div>
+                                </article>
+                              ))
+                          ) : (
+                            <p>Nuk ka punë të kryera të shtuara ende.</p>
                           )}
                         </div>
                       </div>
