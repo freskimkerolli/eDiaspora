@@ -1495,7 +1495,7 @@ function App() {
                       <div>
                         <div className="post-form-card">
                           <h4>Shto një punë të kryer</h4>
-                          <p>Ngarkoni deri në 3 foto dhe shpjegoni punën e kryer.</p>
+                          <p>Ngarkoni deri në 5 foto dhe shpjegoni punën e kryer.</p>
                           <form onSubmit={handleCompletedWorkSubmit}>
                             <label>
                               Fotot (maksimumi 5)
