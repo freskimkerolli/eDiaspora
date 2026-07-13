@@ -6,9 +6,14 @@ import bcrypt from "bcryptjs";
 import {
   createUser,
   findUserByEmail,
+  findUserById,
   findUserByVerificationToken,
   findUserByResetToken,
   updateUser,
+  createPost,
+  listPosts,
+  createCompletedWork,
+  listCompletedWorksByUser,
 } from "./db.js";
 import { sendVerificationEmail, sendPasswordResetEmail } from "./mailer.js";
 
@@ -20,6 +25,8 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || FRONTEND_URL)
   .map((origin) => origin.trim())
   .filter(Boolean);
 const MAX_AVATAR_LENGTH = 2_000_000; // ~1.5MB image as base64
+const MAX_PHOTO_LENGTH = 1_000_000; // ~750KB per resized listing/portfolio photo
+const MAX_PHOTOS = 5;
 
 app.use(
   cors({
@@ -32,11 +39,30 @@ app.use(
     },
   }),
 );
-app.use(express.json({ limit: "3mb" }));
+app.use(express.json({ limit: "8mb" }));
 
 function publicUser(user) {
   const { passwordHash, verificationToken, resetToken, resetTokenExpires, ...safe } = user;
   return safe;
+}
+
+function publicProfile(user) {
+  return {
+    id: user.id,
+    name: user.name,
+    company: user.company,
+    userType: user.userType,
+    avatarUrl: user.avatarUrl,
+  };
+}
+
+function validPhotos(photos) {
+  if (photos === undefined) return true;
+  if (!Array.isArray(photos)) return false;
+  if (photos.length > MAX_PHOTOS) return false;
+  return photos.every(
+    (photo) => typeof photo === "string" && photo.length <= MAX_PHOTO_LENGTH,
+  );
 }
 
 app.post("/api/register", async (req, res) => {
@@ -280,6 +306,137 @@ app.post("/api/reset-password", async (req, res) => {
     return res.json({ message: "Fjalëkalimi u ndryshua me sukses. Tani mund të kyçesh." });
   } catch (err) {
     console.error("Rivendosja e fjalëkalimit dështoi:", err.message);
+    return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
+  }
+});
+
+app.get("/api/posts", async (req, res) => {
+  const { category } = req.query;
+
+  try {
+    const posts = await listPosts({ category: category || undefined });
+    return res.json({ posts });
+  } catch (err) {
+    console.error("Marrja e postimeve dështoi:", err.message);
+    return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
+  }
+});
+
+app.post("/api/posts", async (req, res) => {
+  const { email, title, category, subcategory, type, description, price, photos } =
+    req.body || {};
+
+  if (!email || !title || !category || !subcategory || !type || !description || !price) {
+    return res.status(400).json({ error: "Ju lutemi plotësoni të gjitha fushat e postimit." });
+  }
+
+  if (!validPhotos(photos)) {
+    return res.status(413).json({ error: "Fotot janë ose shumë të mëdha ose shumë të shumta." });
+  }
+
+  try {
+    const user = await findUserByEmail(email);
+    if (!user) {
+      return res.status(404).json({ error: "Llogaria nuk u gjet." });
+    }
+
+    if (!user.isVerified) {
+      return res
+        .status(403)
+        .json({ error: "Ju lutemi verifikoni email-in para se të publikoni." });
+    }
+
+    const post = await createPost({
+      userId: user.id,
+      title,
+      category,
+      subcategory,
+      type,
+      description,
+      price,
+      photos: photos || [],
+    });
+
+    return res.status(201).json({
+      message: "Postimi u regjistrua me sukses.",
+      post: { ...post, author: user.name, userType: user.userType },
+    });
+  } catch (err) {
+    console.error("Postimi dështoi:", err.message);
+    return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
+  }
+});
+
+app.get("/api/users/:id/public", async (req, res) => {
+  const id = Number(req.params.id);
+
+  if (!Number.isInteger(id)) {
+    return res.status(400).json({ error: "ID e llogarisë nuk është valide." });
+  }
+
+  try {
+    const user = await findUserById(id);
+    if (!user) {
+      return res.status(404).json({ error: "Llogaria nuk u gjet." });
+    }
+
+    return res.json({ user: publicProfile(user) });
+  } catch (err) {
+    console.error("Marrja e profilit dështoi:", err.message);
+    return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
+  }
+});
+
+app.get("/api/completed-works", async (req, res) => {
+  const userId = Number(req.query.userId);
+
+  if (!Number.isInteger(userId)) {
+    return res.status(400).json({ error: "ID e llogarisë nuk është valide." });
+  }
+
+  try {
+    const works = await listCompletedWorksByUser(userId);
+    return res.json({ works });
+  } catch (err) {
+    console.error("Marrja e punëve të kryera dështoi:", err.message);
+    return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
+  }
+});
+
+app.post("/api/completed-works", async (req, res) => {
+  const { email, description, photos } = req.body || {};
+
+  if (!email || !description || !Array.isArray(photos) || photos.length === 0) {
+    return res
+      .status(400)
+      .json({ error: "Shtoni të paktën një foto dhe përshkrimin e punës." });
+  }
+
+  if (!validPhotos(photos)) {
+    return res.status(413).json({ error: "Fotot janë ose shumë të mëdha ose shumë të shumta." });
+  }
+
+  try {
+    const user = await findUserByEmail(email);
+    if (!user) {
+      return res.status(404).json({ error: "Llogaria nuk u gjet." });
+    }
+
+    if (!user.isVerified) {
+      return res
+        .status(403)
+        .json({ error: "Ju lutemi verifikoni email-in para se të publikoni." });
+    }
+
+    const work = await createCompletedWork({
+      userId: user.id,
+      description,
+      photos,
+    });
+
+    return res.status(201).json({ message: "Puna e kryer u shtua me sukses.", work });
+  } catch (err) {
+    console.error("Shtimi i punës dështoi:", err.message);
     return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
   }
 });

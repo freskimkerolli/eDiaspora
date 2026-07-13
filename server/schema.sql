@@ -22,3 +22,32 @@ alter table users add column if not exists reset_token text;
 alter table users add column if not exists reset_token_expires timestamptz;
 
 create index if not exists users_reset_token_idx on users (reset_token);
+
+-- Listings posted by users
+create table if not exists posts (
+  id serial primary key,
+  user_id integer not null references users(id) on delete cascade,
+  title text not null,
+  category text not null,
+  subcategory text not null,
+  type text not null,
+  description text not null,
+  price text not null,
+  photos text[] not null default '{}',
+  clicks integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists posts_category_idx on posts (category);
+create index if not exists posts_user_id_idx on posts (user_id);
+
+-- Completed-work portfolio entries shown on a user's public profile
+create table if not exists completed_works (
+  id serial primary key,
+  user_id integer not null references users(id) on delete cascade,
+  description text not null,
+  photos text[] not null default '{}',
+  created_at timestamptz not null default now()
+);
+
+create index if not exists completed_works_user_id_idx on completed_works (user_id);

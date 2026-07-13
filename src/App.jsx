@@ -236,11 +236,12 @@ const getInitialRoute = () => {
 
 const initialPosts = [
   {
-    id: 1,
+    id: "demo-1",
     author: "Agron Krasniqi",
     userType: "business",
     title: "Apartament modern në Gërmi",
     category: "Prona",
+    subcategory: "Banesa",
     type: "Shitje",
     description: "2 + 1 me pamje dhe afër zonave rekreative.",
     price: "€79,000",
@@ -248,11 +249,12 @@ const initialPosts = [
     clicks: 128,
   },
   {
-    id: 2,
+    id: "demo-2",
     author: "Fitore Gashi",
     userType: "business",
     title: "Shtëpi familjare në Pejë",
     category: "Prona",
+    subcategory: "Shtëpi",
     type: "Shitje",
     description: "Kopsht privat, garazh dhe ambient i qetë.",
     price: "€135,000",
@@ -260,11 +262,12 @@ const initialPosts = [
     clicks: 94,
   },
   {
-    id: 3,
+    id: "demo-3",
     author: "Blerim Hoxha",
     userType: "business",
     title: "Studio në Prizren",
     category: "Prona",
+    subcategory: "Banesa",
     type: "Me qira",
     description: "Investim ideal për qira dhe jetë të rehatshme.",
     price: "€49,000",
@@ -272,11 +275,12 @@ const initialPosts = [
     clicks: 76,
   },
   {
-    id: 4,
+    id: "demo-4",
     author: "Driton Rama",
     userType: "business",
     title: "Renovim kuzhine dhe garderobash",
     category: "Mirëmbajtje & Interier",
+    subcategory: "Mirëmbajtje shtëpie",
     type: "Abonim mujor",
     description: "Mobilieri me porosi, dizajn modern për shtëpinë tuaj.",
     price: "800€",
@@ -284,11 +288,12 @@ const initialPosts = [
     clicks: 41,
   },
   {
-    id: 5,
+    id: "demo-5",
     author: "Leutrim Berisha",
     userType: "individual",
     title: "Servisim dhe kontroll para blerjes",
     category: "Automjete",
+    subcategory: "Servise",
     type: "Shitje",
     description: "Kontroll teknik i plotë përpara blerjes së veturës.",
     price: "50€",
@@ -336,6 +341,13 @@ function App() {
   });
   const [completedWorks, setCompletedWorks] = useState([]);
   const [completedWorkMessage, setCompletedWorkMessage] = useState("");
+  const [completedWorkSubmitting, setCompletedWorkSubmitting] = useState(false);
+  const [postSubmitting, setPostSubmitting] = useState(false);
+
+  const [publicProfileUser, setPublicProfileUser] = useState(null);
+  const [publicProfileWorks, setPublicProfileWorks] = useState([]);
+  const [publicProfileStatus, setPublicProfileStatus] = useState("loading");
+  const [publicProfileMessage, setPublicProfileMessage] = useState("");
 
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotMessage, setForgotMessage] = useState("");
@@ -596,14 +608,16 @@ function App() {
     if (files.length === 0) return;
 
     try {
-      const dataUrls = await Promise.all(files.map((file) => resizeImageFile(file)));
+      const dataUrls = await Promise.all(
+        files.map((file) => resizeImageFile(file, 640)),
+      );
       setCompletedWorkForm((current) => ({ ...current, photos: dataUrls }));
     } catch (err) {
       setCompletedWorkMessage("Nuk u arrit ngarkimi i fotove. Provo përsëri.");
     }
   };
 
-  const handleCompletedWorkSubmit = (event) => {
+  const handleCompletedWorkSubmit = async (event) => {
     event.preventDefault();
     if (!currentUser) {
       setCompletedWorkMessage("Ju duhet të hyni për të postuar.");
@@ -620,16 +634,33 @@ function App() {
       return;
     }
 
-    const newWork = {
-      id: completedWorks.length + 1,
-      author: currentUser.name,
-      description: completedWorkForm.description,
-      photos: completedWorkForm.photos,
-    };
+    setCompletedWorkSubmitting(true);
+    setCompletedWorkMessage("");
+    try {
+      const response = await fetch(`${API_URL}/api/completed-works`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: currentUser.email,
+          description: completedWorkForm.description,
+          photos: completedWorkForm.photos,
+        }),
+      });
+      const data = await response.json();
 
-    setCompletedWorks((current) => [newWork, ...current]);
-    setCompletedWorkForm({ description: "", photos: [] });
-    setCompletedWorkMessage("Puna e kryer u shtua me sukses.");
+      if (!response.ok) {
+        setCompletedWorkMessage(data.error || "Shtimi i punës dështoi.");
+        return;
+      }
+
+      setCompletedWorks((current) => [data.work, ...current]);
+      setCompletedWorkForm({ description: "", photos: [] });
+      setCompletedWorkMessage(data.message);
+    } catch (err) {
+      setCompletedWorkMessage("Nuk u arrit lidhja me serverin. Provoni përsëri.");
+    } finally {
+      setCompletedWorkSubmitting(false);
+    }
   };
 
   const handleProfileSubmit = async (event) => {
@@ -680,14 +711,21 @@ function App() {
     });
   };
 
-  const handlePhotoChange = (event) => {
-    const files = Array.from(event.target.files || [])
-      .slice(0, 5)
-      .map((file) => file.name);
-    setPostForm((current) => ({ ...current, photos: files }));
+  const handlePhotoChange = async (event) => {
+    const files = Array.from(event.target.files || []).slice(0, 5);
+    if (files.length === 0) return;
+
+    try {
+      const dataUrls = await Promise.all(
+        files.map((file) => resizeImageFile(file, 640)),
+      );
+      setPostForm((current) => ({ ...current, photos: dataUrls }));
+    } catch (err) {
+      setUploadMessage("Nuk u arrit ngarkimi i fotove. Provo përsëri.");
+    }
   };
 
-  const handlePostSubmit = (event) => {
+  const handlePostSubmit = async (event) => {
     event.preventDefault();
     if (!currentUser) {
       setUploadMessage("Ju duhet të hyni për të postuar.");
@@ -724,28 +762,47 @@ function App() {
         ? postForm.customSubcategory
         : postForm.subcategory;
 
-    const newPost = {
-      id: posts.length + 1,
-      author: currentUser.name,
-      userType: currentUser.userType,
-      clicks: 0,
-      ...postForm,
-      subcategory: resolvedSubcategory,
-    };
-    delete newPost.customSubcategory;
+    setPostSubmitting(true);
+    setUploadMessage("");
+    try {
+      const response = await fetch(`${API_URL}/api/posts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: currentUser.email,
+          title: postForm.title,
+          category: postForm.category,
+          subcategory: resolvedSubcategory,
+          type: postForm.type,
+          description: postForm.description,
+          price: postForm.price,
+          photos: postForm.photos,
+        }),
+      });
+      const data = await response.json();
 
-    setPosts((current) => [newPost, ...current]);
-    setPostForm({
-      title: "",
-      category: "",
-      subcategory: "",
-      customSubcategory: "",
-      type: "Shitje",
-      description: "",
-      price: "",
-      photos: [],
-    });
-    setUploadMessage("Postimi u regjistrua me sukses.");
+      if (!response.ok) {
+        setUploadMessage(data.error || "Postimi dështoi.");
+        return;
+      }
+
+      setPosts((current) => [data.post, ...current]);
+      setPostForm({
+        title: "",
+        category: "",
+        subcategory: "",
+        customSubcategory: "",
+        type: "Shitje",
+        description: "",
+        price: "",
+        photos: [],
+      });
+      setUploadMessage(data.message);
+    } catch (err) {
+      setUploadMessage("Nuk u arrit lidhja me serverin. Provoni përsëri.");
+    } finally {
+      setPostSubmitting(false);
+    }
   };
 
   const handlePostClick = (postId) => {
@@ -762,12 +819,18 @@ function App() {
     (section) => `/${slugify(section.title)}` === route,
   );
   const isCategoryPage = Boolean(currentCategory);
+  const categoryPosts = currentCategory
+    ? posts.filter((post) => post.category === currentCategory.title)
+    : [];
   const isAuthPage =
     route === "/auth" || route === "/login" || route === "/register";
   const isVerifyPage = route === "/verify";
   const isForgotPasswordPage = route === "/forgot-password";
   const isResetPasswordPage = route === "/reset-password";
   const authMode = route === "/register" ? "register" : "login";
+  const profileRouteMatch = route.match(/^\/profili\/(\d+)$/);
+  const isProfilePage = Boolean(profileRouteMatch);
+  const profileUserId = profileRouteMatch ? Number(profileRouteMatch[1]) : null;
 
   const [pendingScroll, setPendingScroll] = useState(null);
 
@@ -829,6 +892,64 @@ function App() {
         setVerifyMessage("Nuk u arrit lidhja me serverin. Provoni përsëri.");
       });
   }, [isVerifyPage]);
+
+  useEffect(() => {
+    fetch(`${API_URL}/api/posts`)
+      .then((response) => response.json())
+      .then((data) => {
+        if (!Array.isArray(data.posts) || data.posts.length === 0) return;
+        setPosts((current) => [...data.posts, ...current]);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!currentUser) {
+      setCompletedWorks([]);
+      return;
+    }
+
+    fetch(`${API_URL}/api/completed-works?userId=${currentUser.id}`)
+      .then((response) => response.json())
+      .then((data) => {
+        setCompletedWorks(Array.isArray(data.works) ? data.works : []);
+      })
+      .catch(() => {});
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    if (!isProfilePage) return;
+
+    setPublicProfileStatus("loading");
+    setPublicProfileUser(null);
+    setPublicProfileWorks([]);
+
+    Promise.all([
+      fetch(`${API_URL}/api/users/${profileUserId}/public`).then((response) =>
+        response.json().then((data) => ({ ok: response.ok, data })),
+      ),
+      fetch(`${API_URL}/api/completed-works?userId=${profileUserId}`).then((response) =>
+        response.json().then((data) => ({ ok: response.ok, data })),
+      ),
+    ])
+      .then(([userResult, worksResult]) => {
+        if (!userResult.ok) {
+          setPublicProfileStatus("error");
+          setPublicProfileMessage(
+            userResult.data.error || "Profili nuk u gjet.",
+          );
+          return;
+        }
+
+        setPublicProfileUser(userResult.data.user);
+        setPublicProfileWorks(worksResult.ok ? worksResult.data.works || [] : []);
+        setPublicProfileStatus("success");
+      })
+      .catch(() => {
+        setPublicProfileStatus("error");
+        setPublicProfileMessage("Nuk u arrit lidhja me serverin. Provoni përsëri.");
+      });
+  }, [isProfilePage, profileUserId]);
 
   return (
     <div className="app-shell">
@@ -901,7 +1022,8 @@ function App() {
           !isAuthPage &&
           !isCategoryPage &&
           !isForgotPasswordPage &&
-          !isResetPasswordPage && (
+          !isResetPasswordPage &&
+          !isProfilePage && (
         <section className="hero" id="home">
           <div className="container hero-content">
             <div>
@@ -1457,8 +1579,12 @@ function App() {
                                 onChange={handlePhotoChange}
                               />
                             </label>
-                            <button type="submit" className="button button-primary">
-                              Publiko ofertën
+                            <button
+                              type="submit"
+                              className="button button-primary"
+                              disabled={postSubmitting}
+                            >
+                              {postSubmitting ? "Duke publikuar..." : "Publiko ofertën"}
                             </button>
                             {uploadMessage && (
                               <p className="form-message">{uploadMessage}</p>
@@ -1468,13 +1594,20 @@ function App() {
 
                         <div className="posts-list">
                           <h4>Postimet e mia</h4>
-                          {posts.filter((post) => post.author === currentUser.name)
+                          {posts.filter((post) => post.userId === currentUser.id)
                             .length > 0 ? (
                             posts
-                              .filter((post) => post.author === currentUser.name)
+                              .filter((post) => post.userId === currentUser.id)
                               .map((post) => (
                                 <article key={post.id} className="business-card">
                                   <div>
+                                    {post.photos && post.photos.length > 0 && (
+                                      <div className="completed-work-preview">
+                                        {post.photos.map((photo, index) => (
+                                          <img key={index} src={photo} alt={post.title} />
+                                        ))}
+                                      </div>
+                                    )}
                                     <h4>{post.title}</h4>
                                     <p className="business-meta">
                                       {post.category} • {post.subcategory} • {post.type}
@@ -1523,8 +1656,12 @@ function App() {
                                 placeholder="Shpjegoni punën e kryer"
                               />
                             </label>
-                            <button type="submit" className="button button-primary">
-                              Publiko punën
+                            <button
+                              type="submit"
+                              className="button button-primary"
+                              disabled={completedWorkSubmitting}
+                            >
+                              {completedWorkSubmitting ? "Duke publikuar..." : "Publiko punën"}
                             </button>
                             {completedWorkMessage && (
                               <p className="form-message">{completedWorkMessage}</p>
@@ -1534,11 +1671,11 @@ function App() {
 
                         <div className="completed-works-list">
                           <h4>Punët e kryera</h4>
-                          {completedWorks.filter((work) => work.author === currentUser.name)
+                          {completedWorks.filter((work) => work.userId === currentUser.id)
                             .length > 0 ? (
                             <div className="completed-works-row">
                               {completedWorks
-                                .filter((work) => work.author === currentUser.name)
+                                .filter((work) => work.userId === currentUser.id)
                                 .map((work) => (
                                   <article key={work.id} className="completed-work-card">
                                     <div className="completed-work-preview">
@@ -1734,6 +1871,103 @@ function App() {
                 </article>
               ))}
             </div>
+
+            <div className="section-header">
+              <div>
+                <p className="eyebrow">Postimet</p>
+                <h2>Ofertat në {currentCategory.title}</h2>
+              </div>
+            </div>
+
+            {categoryPosts.length > 0 ? (
+              <div className="property-grid">
+                {categoryPosts.map((post) => (
+                  <article
+                    key={post.id}
+                    className="property-card-large property-card-clickable"
+                    onClick={() => handlePostClick(post.id)}
+                  >
+                    {post.photos && post.photos.length > 0 && (
+                      <div className="completed-work-preview">
+                        {post.photos.map((photo, index) => (
+                          <img key={index} src={photo} alt={post.title} />
+                        ))}
+                      </div>
+                    )}
+                    <span className="tag">{post.subcategory}</span>
+                    <h3>{post.title}</h3>
+                    <p>{post.description}</p>
+                    <span className="price">{post.price}</span>
+                    {post.userId && (
+                      <a
+                        href={`/profili/${post.userId}`}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleLinkClick(`/profili/${post.userId}`)(event);
+                        }}
+                        className="auth-panel-link"
+                      >
+                        Shiko profilin e biznesit
+                      </a>
+                    )}
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <p>Nuk ka ende postime në këtë kategori.</p>
+            )}
+          </section>
+        ) : isProfilePage ? (
+          <section className="category-page container">
+            {publicProfileStatus === "loading" ? (
+              <p>Duke ngarkuar profilin...</p>
+            ) : publicProfileStatus === "error" ? (
+              <div className="verify-card">
+                <h2>Profili nuk u gjet</h2>
+                <p>{publicProfileMessage}</p>
+                <a href="/" onClick={handleLinkClick("/")} className="button button-primary">
+                  Kthehu në fillim
+                </a>
+              </div>
+            ) : (
+              <>
+                <div className="section-header">
+                  <div>
+                    <p className="eyebrow">Profili</p>
+                    <h2>{publicProfileUser.name}</h2>
+                    {publicProfileUser.userType === "business" &&
+                      publicProfileUser.company && <p>{publicProfileUser.company}</p>}
+                  </div>
+                  <a
+                    href="/"
+                    onClick={handleLinkClick("/")}
+                    className="button button-secondary"
+                  >
+                    Kthehu në fillim
+                  </a>
+                </div>
+
+                <div className="completed-works-list">
+                  <h4>Punët e kryera</h4>
+                  {publicProfileWorks.length > 0 ? (
+                    <div className="completed-works-row">
+                      {publicProfileWorks.map((work) => (
+                        <article key={work.id} className="completed-work-card">
+                          <div className="completed-work-preview">
+                            {work.photos.map((photo, index) => (
+                              <img key={index} src={photo} alt="Foto e punës" />
+                            ))}
+                          </div>
+                          <p>{work.description}</p>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <p>Ky user nuk ka shtuar ende punë të kryera.</p>
+                  )}
+                </div>
+              </>
+            )}
           </section>
         ) : (
           <>
