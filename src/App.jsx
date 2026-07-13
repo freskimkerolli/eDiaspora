@@ -228,6 +228,11 @@ const slugify = (value) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
 
+const formatPrice = (price) => {
+  if (!price) return "";
+  return String(price).includes("€") ? String(price) : `${price}€`;
+};
+
 const getInitialRoute = () => {
   const path = window.location.pathname;
   if (path === "/") return "/";
@@ -348,6 +353,11 @@ function App() {
   const [publicProfileWorks, setPublicProfileWorks] = useState([]);
   const [publicProfileStatus, setPublicProfileStatus] = useState("loading");
   const [publicProfileMessage, setPublicProfileMessage] = useState("");
+
+  const [contactOpen, setContactOpen] = useState(false);
+  const [contactForm, setContactForm] = useState({ name: "", contact: "", message: "" });
+  const [contactSubmitting, setContactSubmitting] = useState(false);
+  const [contactMessage, setContactMessage] = useState("");
 
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotMessage, setForgotMessage] = useState("");
@@ -663,6 +673,46 @@ function App() {
     }
   };
 
+  const handleContactChange = (event) => {
+    const { name, value } = event.target;
+    setContactForm((current) => ({ ...current, [name]: value }));
+  };
+
+  const handleContactSubmit = async (event) => {
+    event.preventDefault();
+
+    if (!contactForm.name || !contactForm.contact || !contactForm.message) {
+      setContactMessage("Ju lutemi plotësoni emrin, kontaktin dhe mesazhin.");
+      return;
+    }
+
+    setContactSubmitting(true);
+    setContactMessage("");
+    try {
+      const response = await fetch(
+        `${API_URL}/api/users/${profileUserId}/contact`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(contactForm),
+        },
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        setContactMessage(data.error || "Dërgimi i mesazhit dështoi.");
+        return;
+      }
+
+      setContactForm({ name: "", contact: "", message: "" });
+      setContactMessage(data.message);
+    } catch (err) {
+      setContactMessage("Nuk u arrit lidhja me serverin. Provoni përsëri.");
+    } finally {
+      setContactSubmitting(false);
+    }
+  };
+
   const handleProfileSubmit = async (event) => {
     event.preventDefault();
     setProfileSubmitting(true);
@@ -923,6 +973,9 @@ function App() {
     setPublicProfileStatus("loading");
     setPublicProfileUser(null);
     setPublicProfileWorks([]);
+    setContactOpen(false);
+    setContactForm({ name: "", contact: "", message: "" });
+    setContactMessage("");
 
     Promise.all([
       fetch(`${API_URL}/api/users/${profileUserId}/public`).then((response) =>
@@ -1563,12 +1616,18 @@ function App() {
                             </label>
                             <label>
                               Çmimi
-                              <input
-                                name="price"
-                                value={postForm.price}
-                                onChange={handlePostChange}
-                                placeholder="P.sh. 1200€/muaj ose 45000€"
-                              />
+                              <div className="price-input">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="1"
+                                  name="price"
+                                  value={postForm.price}
+                                  onChange={handlePostChange}
+                                  placeholder="P.sh. 1200"
+                                />
+                                <span>€</span>
+                              </div>
                             </label>
                             <label>
                               Fotot (maksimumi 5)
@@ -1613,7 +1672,7 @@ function App() {
                                       {post.category} • {post.subcategory} • {post.type}
                                     </p>
                                     <p>{post.description}</p>
-                                    <p className="business-meta">Çmimi: {post.price}</p>
+                                    <p className="business-meta">Çmimi: {formatPrice(post.price)}</p>
                                   </div>
                                 </article>
                               ))
@@ -1864,11 +1923,11 @@ function App() {
               </a>
             </div>
 
-            <div className="category-grid">
+            <div className="subcategory-row">
               {currentCategory.items.map((item) => (
-                <article key={item} className="subcategory-card">
-                  <h3>{item}</h3>
-                </article>
+                <span key={item} className="subcategory-pill">
+                  {item}
+                </span>
               ))}
             </div>
 
@@ -1880,36 +1939,38 @@ function App() {
             </div>
 
             {categoryPosts.length > 0 ? (
-              <div className="property-grid">
+              <div className="post-compact-grid">
                 {categoryPosts.map((post) => (
                   <article
                     key={post.id}
-                    className="property-card-large property-card-clickable"
+                    className="post-compact-card"
                     onClick={() => handlePostClick(post.id)}
                   >
-                    {post.photos && post.photos.length > 0 && (
-                      <div className="completed-work-preview">
-                        {post.photos.map((photo, index) => (
-                          <img key={index} src={photo} alt={post.title} />
-                        ))}
-                      </div>
-                    )}
-                    <span className="tag">{post.subcategory}</span>
-                    <h3>{post.title}</h3>
-                    <p>{post.description}</p>
-                    <span className="price">{post.price}</span>
-                    {post.userId && (
-                      <a
-                        href={`/profili/${post.userId}`}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          handleLinkClick(`/profili/${post.userId}`)(event);
-                        }}
-                        className="auth-panel-link"
-                      >
-                        Shiko profilin e biznesit
-                      </a>
-                    )}
+                    <div className="post-compact-thumb">
+                      {post.photos && post.photos.length > 0 ? (
+                        <img src={post.photos[0]} alt={post.title} />
+                      ) : (
+                        <span aria-hidden="true">{currentCategory.emoji}</span>
+                      )}
+                    </div>
+                    <div className="post-compact-body">
+                      <span className="tag tag-sm">{post.subcategory}</span>
+                      <h4>{post.title}</h4>
+                      <p className="post-compact-desc">{post.description}</p>
+                      <span className="price price-sm">{formatPrice(post.price)}</span>
+                      {post.userId && (
+                        <a
+                          href={`/profili/${post.userId}`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleLinkClick(`/profili/${post.userId}`)(event);
+                          }}
+                          className="post-compact-link"
+                        >
+                          Shiko profilin
+                        </a>
+                      )}
+                    </div>
                   </article>
                 ))}
               </div>
@@ -1938,14 +1999,69 @@ function App() {
                     {publicProfileUser.userType === "business" &&
                       publicProfileUser.company && <p>{publicProfileUser.company}</p>}
                   </div>
-                  <a
-                    href="/"
-                    onClick={handleLinkClick("/")}
-                    className="button button-secondary"
-                  >
-                    Kthehu në fillim
-                  </a>
+                  <div className="profile-actions">
+                    <button
+                      type="button"
+                      className="button button-primary"
+                      onClick={() => setContactOpen((current) => !current)}
+                    >
+                      {contactOpen ? "Mbyll kontaktin" : "Kontakto"}
+                    </button>
+                    <a
+                      href="/"
+                      onClick={handleLinkClick("/")}
+                      className="button button-secondary"
+                    >
+                      Kthehu në fillim
+                    </a>
+                  </div>
                 </div>
+
+                {contactOpen && (
+                  <div className="auth-card contact-card">
+                    <h3 className="auth-panel-title">Dërgo një ofertë</h3>
+                    <form onSubmit={handleContactSubmit} className="registration-form">
+                      <label>
+                        Emri yt
+                        <input
+                          name="name"
+                          value={contactForm.name}
+                          onChange={handleContactChange}
+                          placeholder="Emri yt"
+                        />
+                      </label>
+                      <label>
+                        Email ose telefon
+                        <input
+                          name="contact"
+                          value={contactForm.contact}
+                          onChange={handleContactChange}
+                          placeholder="email@shembull.com ose +383 4X XXX XXX"
+                        />
+                      </label>
+                      <label>
+                        Mesazhi / oferta
+                        <textarea
+                          name="message"
+                          value={contactForm.message}
+                          onChange={handleContactChange}
+                          rows="4"
+                          placeholder="Shkruaj ofertën ose pyetjen tënde"
+                        />
+                      </label>
+                      <button
+                        type="submit"
+                        className="button button-primary"
+                        disabled={contactSubmitting}
+                      >
+                        {contactSubmitting ? "Duke dërguar..." : "Dërgo mesazhin"}
+                      </button>
+                      {contactMessage && (
+                        <p className="form-message">{contactMessage}</p>
+                      )}
+                    </form>
+                  </div>
+                )}
 
                 <div className="completed-works-list">
                   <h4>Punët e kryera</h4>
@@ -2009,7 +2125,7 @@ function App() {
                 <span className="tag">{post.category}</span>
                 <h3>{post.title}</h3>
                 <p>{post.description}</p>
-                <span className="price">{post.price}</span>
+                <span className="price">{formatPrice(post.price)}</span>
               </article>
             ))}
           </div>

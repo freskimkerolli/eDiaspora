@@ -4,6 +4,15 @@ const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
   : null;
 
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export async function sendVerificationEmail(to, name, verifyUrl) {
   if (!resend) {
     console.log(
@@ -35,6 +44,44 @@ export async function sendVerificationEmail(to, name, verifyUrl) {
           Nëse butoni nuk funksionon, kopjo këtë link në shfletues:<br />
           ${verifyUrl}
         </p>
+      </div>
+    `,
+  });
+
+  if (error) {
+    throw new Error(error.message || "Dërgimi i email-it dështoi.");
+  }
+
+  return data;
+}
+
+export async function sendContactMessage(to, toName, fromName, fromContact, message) {
+  if (!resend) {
+    console.log(
+      `[dev] RESEND_API_KEY nuk është vendosur. Mesazh kontakti për ${to} nga ${fromName} (${fromContact}):\n${message}`,
+    );
+    return { simulated: true };
+  }
+
+  const from = process.env.EMAIL_FROM || "eDiaspora <onboarding@resend.dev>";
+  const safeFromName = escapeHtml(fromName);
+  const safeFromContact = escapeHtml(fromContact);
+  const safeMessage = escapeHtml(message);
+
+  const { data, error } = await resend.emails.send({
+    from,
+    to,
+    replyTo: fromContact,
+    subject: `Ofertë e re nga ${safeFromName} - eDiaspora`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+        <h2 style="color:#111;">Përshëndetje ${escapeHtml(toName)},</h2>
+        <p style="color:#4b5563;">
+          Ke marrë një mesazh të ri përmes profilit tënd në eDiaspora.
+        </p>
+        <p style="color:#111;"><strong>Nga:</strong> ${safeFromName}</p>
+        <p style="color:#111;"><strong>Kontakt:</strong> ${safeFromContact}</p>
+        <p style="color:#4b5563; white-space: pre-wrap;">${safeMessage}</p>
       </div>
     `,
   });

@@ -15,7 +15,11 @@ import {
   createCompletedWork,
   listCompletedWorksByUser,
 } from "./db.js";
-import { sendVerificationEmail, sendPasswordResetEmail } from "./mailer.js";
+import {
+  sendVerificationEmail,
+  sendPasswordResetEmail,
+  sendContactMessage,
+} from "./mailer.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -384,6 +388,39 @@ app.get("/api/users/:id/public", async (req, res) => {
   } catch (err) {
     console.error("Marrja e profilit dështoi:", err.message);
     return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
+  }
+});
+
+app.post("/api/users/:id/contact", async (req, res) => {
+  const id = Number(req.params.id);
+  const { name, contact, message } = req.body || {};
+
+  if (!Number.isInteger(id)) {
+    return res.status(400).json({ error: "ID e llogarisë nuk është valide." });
+  }
+
+  if (!name || !contact || !message) {
+    return res
+      .status(400)
+      .json({ error: "Ju lutemi plotësoni emrin, kontaktin dhe mesazhin." });
+  }
+
+  if (name.length > 200 || contact.length > 200 || message.length > 4000) {
+    return res.status(400).json({ error: "Mesazhi është shumë i gjatë." });
+  }
+
+  try {
+    const user = await findUserById(id);
+    if (!user) {
+      return res.status(404).json({ error: "Llogaria nuk u gjet." });
+    }
+
+    await sendContactMessage(user.email, user.name, name, contact, message);
+
+    return res.json({ message: "Mesazhi u dërgua me sukses." });
+  } catch (err) {
+    console.error("Dërgimi i mesazhit dështoi:", err.message);
+    return res.status(502).json({ error: "Dërgimi i mesazhit dështoi. Provoni përsëri." });
   }
 });
 
