@@ -14,11 +14,17 @@ import {
   listPosts,
   createCompletedWork,
   listCompletedWorksByUser,
+  createContactMessage,
+  listContactMessagesByUser,
+  findContactMessageById,
+  replyToContactMessage,
 } from "./db.js";
 import {
   sendVerificationEmail,
   sendPasswordResetEmail,
   sendContactMessage,
+  sendContactReplyEmail,
+  isEmail,
 } from "./mailer.js";
 
 const app = express();
@@ -415,12 +421,96 @@ app.post("/api/users/:id/contact", async (req, res) => {
       return res.status(404).json({ error: "Llogaria nuk u gjet." });
     }
 
-    await sendContactMessage(user.email, user.name, name, contact, message);
+    const saved = await createContactMessage({
+      recipientUserId: user.id,
+      senderName: name,
+      senderContact: contact,
+      message,
+    });
 
-    return res.json({ message: "Mesazhi u dërgua me sukses." });
+    try {
+      await sendContactMessage(user.email, user.name, name, contact, message);
+    } catch (err) {
+      console.error("Dërgimi i email-it të kontaktit dështoi:", err.message);
+    }
+
+    return res
+      .status(201)
+      .json({ message: "Mesazhi u dërgua me sukses.", contactMessage: saved });
   } catch (err) {
-    console.error("Dërgimi i mesazhit dështoi:", err.message);
-    return res.status(502).json({ error: "Dërgimi i mesazhit dështoi. Provoni përsëri." });
+    console.error("Ruajtja e mesazhit dështoi:", err.message);
+    return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
+  }
+});
+
+app.get("/api/messages", async (req, res) => {
+  const { email } = req.query;
+
+  if (!email) {
+    return res.status(400).json({ error: "Mungon email-i i llogarisë." });
+  }
+
+  try {
+    const user = await findUserByEmail(email);
+    if (!user) {
+      return res.status(404).json({ error: "Llogaria nuk u gjet." });
+    }
+
+    const messages = await listContactMessagesByUser(user.id);
+    return res.json({ messages });
+  } catch (err) {
+    console.error("Marrja e mesazheve dështoi:", err.message);
+    return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
+  }
+});
+
+app.post("/api/messages/:id/reply", async (req, res) => {
+  const id = Number(req.params.id);
+  const { email, reply } = req.body || {};
+
+  if (!Number.isInteger(id)) {
+    return res.status(400).json({ error: "ID e mesazhit nuk është valide." });
+  }
+
+  if (!email || !reply) {
+    return res.status(400).json({ error: "Ju lutemi shkruani përgjigjen." });
+  }
+
+  if (reply.length > 4000) {
+    return res.status(400).json({ error: "Përgjigja është shumë e gjatë." });
+  }
+
+  try {
+    const existing = await findContactMessageById(id);
+    if (!existing) {
+      return res.status(404).json({ error: "Mesazhi nuk u gjet." });
+    }
+
+    const user = await findUserByEmail(email);
+    if (!user || user.id !== existing.recipientUserId) {
+      return res.status(403).json({ error: "Nuk keni qasje në këtë mesazh." });
+    }
+
+    const updated = await replyToContactMessage(id, reply);
+
+    if (isEmail(existing.senderContact)) {
+      try {
+        await sendContactReplyEmail(
+          existing.senderContact,
+          existing.senderName,
+          user.name,
+          reply,
+          existing.message,
+        );
+      } catch (err) {
+        console.error("Dërgimi i përgjigjes me email dështoi:", err.message);
+      }
+    }
+
+    return res.json({ message: "Përgjigja u dërgua me sukses.", contactMessage: updated });
+  } catch (err) {
+    console.error("Dërgimi i përgjigjes dështoi:", err.message);
+    return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
   }
 });
 

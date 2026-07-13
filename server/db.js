@@ -198,3 +198,51 @@ export async function listCompletedWorksByUser(userId) {
   );
   return rows.map(mapWorkRow);
 }
+
+function mapMessageRow(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    recipientUserId: row.recipient_user_id,
+    senderName: row.sender_name,
+    senderContact: row.sender_contact,
+    message: row.message,
+    reply: row.reply,
+    repliedAt: row.replied_at,
+    createdAt: row.created_at,
+  };
+}
+
+export async function createContactMessage(msg) {
+  const { rows } = await pool.query(
+    `INSERT INTO contact_messages (recipient_user_id, sender_name, sender_contact, message)
+     VALUES ($1, $2, $3, $4)
+     RETURNING *`,
+    [msg.recipientUserId, msg.senderName, msg.senderContact, msg.message],
+  );
+  return mapMessageRow(rows[0]);
+}
+
+export async function listContactMessagesByUser(userId) {
+  const { rows } = await pool.query(
+    "SELECT * FROM contact_messages WHERE recipient_user_id = $1 ORDER BY created_at DESC",
+    [userId],
+  );
+  return rows.map(mapMessageRow);
+}
+
+export async function findContactMessageById(id) {
+  const { rows } = await pool.query(
+    "SELECT * FROM contact_messages WHERE id = $1",
+    [id],
+  );
+  return mapMessageRow(rows[0]);
+}
+
+export async function replyToContactMessage(id, reply) {
+  const { rows } = await pool.query(
+    `UPDATE contact_messages SET reply = $1, replied_at = now() WHERE id = $2 RETURNING *`,
+    [reply, id],
+  );
+  return mapMessageRow(rows[0]);
+}

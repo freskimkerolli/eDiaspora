@@ -51,3 +51,17 @@ create table if not exists completed_works (
 );
 
 create index if not exists completed_works_user_id_idx on completed_works (user_id);
+
+-- Contact messages sent through a business's public profile
+create table if not exists contact_messages (
+  id serial primary key,
+  recipient_user_id integer not null references users(id) on delete cascade,
+  sender_name text not null,
+  sender_contact text not null,
+  message text not null,
+  reply text,
+  replied_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists contact_messages_recipient_idx on contact_messages (recipient_user_id);

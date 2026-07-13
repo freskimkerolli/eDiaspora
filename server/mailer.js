@@ -13,6 +13,11 @@ function escapeHtml(value) {
     .replace(/'/g, "&#39;");
 }
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export function isEmail(value) {
+  return typeof value === "string" && EMAIL_RE.test(value);
+}
+
 export async function sendVerificationEmail(to, name, verifyUrl) {
   if (!resend) {
     console.log(
@@ -71,7 +76,7 @@ export async function sendContactMessage(to, toName, fromName, fromContact, mess
   const { data, error } = await resend.emails.send({
     from,
     to,
-    replyTo: fromContact,
+    ...(isEmail(fromContact) ? { replyTo: fromContact } : {}),
     subject: `Ofertë e re nga ${safeFromName} - eDiaspora`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
@@ -82,6 +87,46 @@ export async function sendContactMessage(to, toName, fromName, fromContact, mess
         <p style="color:#111;"><strong>Nga:</strong> ${safeFromName}</p>
         <p style="color:#111;"><strong>Kontakt:</strong> ${safeFromContact}</p>
         <p style="color:#4b5563; white-space: pre-wrap;">${safeMessage}</p>
+      </div>
+    `,
+  });
+
+  if (error) {
+    throw new Error(error.message || "Dërgimi i email-it dështoi.");
+  }
+
+  return data;
+}
+
+export async function sendContactReplyEmail(to, toName, fromName, reply, originalMessage) {
+  if (!resend) {
+    console.log(
+      `[dev] RESEND_API_KEY nuk është vendosur. Përgjigje për ${to} nga ${fromName}:\n${reply}`,
+    );
+    return { simulated: true };
+  }
+
+  const from = process.env.EMAIL_FROM || "eDiaspora <onboarding@resend.dev>";
+  const safeToName = escapeHtml(toName);
+  const safeFromName = escapeHtml(fromName);
+  const safeReply = escapeHtml(reply);
+  const safeOriginal = escapeHtml(originalMessage);
+
+  const { data, error } = await resend.emails.send({
+    from,
+    to,
+    subject: `${safeFromName} të është përgjigjur - eDiaspora`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+        <h2 style="color:#111;">Përshëndetje ${safeToName},</h2>
+        <p style="color:#4b5563;">
+          <strong>${safeFromName}</strong> të është përgjigjur në mesazhin tënd
+          në eDiaspora.
+        </p>
+        <p style="color:#111; white-space: pre-wrap;">${safeReply}</p>
+        <hr style="border:none; border-top:1px solid #e5e7eb; margin:1.5rem 0;" />
+        <p style="color:#9ca3af; font-size:0.85rem;">Mesazhi yt origjinal:</p>
+        <p style="color:#9ca3af; font-size:0.85rem; white-space: pre-wrap;">${safeOriginal}</p>
       </div>
     `,
   });

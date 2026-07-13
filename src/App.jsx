@@ -358,6 +358,14 @@ function App() {
   const [contactForm, setContactForm] = useState({ name: "", contact: "", message: "" });
   const [contactSubmitting, setContactSubmitting] = useState(false);
   const [contactMessage, setContactMessage] = useState("");
+  const [contactTargetId, setContactTargetId] = useState(null);
+
+  const [selectedSubcategory, setSelectedSubcategory] = useState(null);
+
+  const [messages, setMessages] = useState([]);
+  const [replyDrafts, setReplyDrafts] = useState({});
+  const [replySubmittingId, setReplySubmittingId] = useState(null);
+  const [replyFeedback, setReplyFeedback] = useState({});
 
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotMessage, setForgotMessage] = useState("");
@@ -681,6 +689,8 @@ function App() {
   const handleContactSubmit = async (event) => {
     event.preventDefault();
 
+    if (!contactTargetId) return;
+
     if (!contactForm.name || !contactForm.contact || !contactForm.message) {
       setContactMessage("Ju lutemi plotësoni emrin, kontaktin dhe mesazhin.");
       return;
@@ -690,7 +700,7 @@ function App() {
     setContactMessage("");
     try {
       const response = await fetch(
-        `${API_URL}/api/users/${profileUserId}/contact`,
+        `${API_URL}/api/users/${contactTargetId}/contact`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -710,6 +720,55 @@ function App() {
       setContactMessage("Nuk u arrit lidhja me serverin. Provoni përsëri.");
     } finally {
       setContactSubmitting(false);
+    }
+  };
+
+  const handleReplyChange = (messageId, value) => {
+    setReplyDrafts((current) => ({ ...current, [messageId]: value }));
+  };
+
+  const handleReplySubmit = (messageId) => async (event) => {
+    event.preventDefault();
+    const reply = replyDrafts[messageId];
+
+    if (!reply) {
+      setReplyFeedback((current) => ({
+        ...current,
+        [messageId]: "Shkruaj një përgjigje para se ta dërgosh.",
+      }));
+      return;
+    }
+
+    setReplySubmittingId(messageId);
+    setReplyFeedback((current) => ({ ...current, [messageId]: "" }));
+    try {
+      const response = await fetch(`${API_URL}/api/messages/${messageId}/reply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: currentUser.email, reply }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setReplyFeedback((current) => ({
+          ...current,
+          [messageId]: data.error || "Dërgimi i përgjigjes dështoi.",
+        }));
+        return;
+      }
+
+      setMessages((current) =>
+        current.map((msg) => (msg.id === messageId ? data.contactMessage : msg)),
+      );
+      setReplyDrafts((current) => ({ ...current, [messageId]: "" }));
+      setReplyFeedback((current) => ({ ...current, [messageId]: data.message }));
+    } catch (err) {
+      setReplyFeedback((current) => ({
+        ...current,
+        [messageId]: "Nuk u arrit lidhja me serverin. Provoni përsëri.",
+      }));
+    } finally {
+      setReplySubmittingId(null);
     }
   };
 
@@ -870,7 +929,11 @@ function App() {
   );
   const isCategoryPage = Boolean(currentCategory);
   const categoryPosts = currentCategory
-    ? posts.filter((post) => post.category === currentCategory.title)
+    ? posts.filter(
+        (post) =>
+          post.category === currentCategory.title &&
+          (!selectedSubcategory || post.subcategory === selectedSubcategory),
+      )
     : [];
   const isAuthPage =
     route === "/auth" || route === "/login" || route === "/register";
@@ -881,6 +944,12 @@ function App() {
   const profileRouteMatch = route.match(/^\/profili\/(\d+)$/);
   const isProfilePage = Boolean(profileRouteMatch);
   const profileUserId = profileRouteMatch ? Number(profileRouteMatch[1]) : null;
+  const postRouteMatch = route.match(/^\/postim\/([^/]+)$/);
+  const isPostPage = Boolean(postRouteMatch);
+  const postRouteId = postRouteMatch ? postRouteMatch[1] : null;
+  const currentPost = isPostPage
+    ? posts.find((post) => String(post.id) === postRouteId)
+    : null;
 
   const [pendingScroll, setPendingScroll] = useState(null);
 
@@ -911,6 +980,14 @@ function App() {
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
+
+  useEffect(() => {
+    setContactOpen(false);
+    setContactForm({ name: "", contact: "", message: "" });
+    setContactMessage("");
+    setContactTargetId(null);
+    setSelectedSubcategory(null);
+  }, [route]);
 
   useEffect(() => {
     if (!pendingScroll || route !== "/") return;
@@ -968,14 +1045,25 @@ function App() {
   }, [currentUser?.id]);
 
   useEffect(() => {
+    if (!currentUser) {
+      setMessages([]);
+      return;
+    }
+
+    fetch(`${API_URL}/api/messages?email=${encodeURIComponent(currentUser.email)}`)
+      .then((response) => response.json())
+      .then((data) => {
+        setMessages(Array.isArray(data.messages) ? data.messages : []);
+      })
+      .catch(() => {});
+  }, [currentUser?.id]);
+
+  useEffect(() => {
     if (!isProfilePage) return;
 
     setPublicProfileStatus("loading");
     setPublicProfileUser(null);
     setPublicProfileWorks([]);
-    setContactOpen(false);
-    setContactForm({ name: "", contact: "", message: "" });
-    setContactMessage("");
 
     Promise.all([
       fetch(`${API_URL}/api/users/${profileUserId}/public`).then((response) =>
@@ -1003,6 +1091,52 @@ function App() {
         setPublicProfileMessage("Nuk u arrit lidhja me serverin. Provoni përsëri.");
       });
   }, [isProfilePage, profileUserId]);
+
+  const contactFormPanel = (
+    <div className="auth-grid">
+      <div className="auth-card contact-card">
+        <h3 className="auth-panel-title">Dërgo një ofertë</h3>
+        <form onSubmit={handleContactSubmit} className="registration-form">
+          <label>
+            Emri yt
+            <input
+              name="name"
+              value={contactForm.name}
+              onChange={handleContactChange}
+              placeholder="Emri yt"
+            />
+          </label>
+          <label>
+            Email ose telefon
+            <input
+              name="contact"
+              value={contactForm.contact}
+              onChange={handleContactChange}
+              placeholder="email@shembull.com ose +383 4X XXX XXX"
+            />
+          </label>
+          <label>
+            Mesazhi / oferta
+            <textarea
+              name="message"
+              value={contactForm.message}
+              onChange={handleContactChange}
+              rows="4"
+              placeholder="Shkruaj ofertën ose pyetjen tënde"
+            />
+          </label>
+          <button
+            type="submit"
+            className="button button-primary"
+            disabled={contactSubmitting}
+          >
+            {contactSubmitting ? "Duke dërguar..." : "Dërgo mesazhin"}
+          </button>
+          {contactMessage && <p className="form-message">{contactMessage}</p>}
+        </form>
+      </div>
+    </div>
+  );
 
   return (
     <div className="app-shell">
@@ -1076,7 +1210,8 @@ function App() {
           !isCategoryPage &&
           !isForgotPasswordPage &&
           !isResetPasswordPage &&
-          !isProfilePage && (
+          !isProfilePage &&
+          !isPostPage && (
         <section className="hero" id="home">
           <div className="container hero-content">
             <div>
@@ -1360,6 +1495,17 @@ function App() {
                       onClick={() => setDashboardSection("completed-works")}
                     >
                       Punët e kryera
+                    </button>
+                    <button
+                      type="button"
+                      className={
+                        dashboardSection === "messages"
+                          ? "dashboard-nav-item active"
+                          : "dashboard-nav-item"
+                      }
+                      onClick={() => setDashboardSection("messages")}
+                    >
+                      Mesazhet
                     </button>
                   </nav>
 
@@ -1752,6 +1898,58 @@ function App() {
                         </div>
                       </div>
                     )}
+
+                    {dashboardSection === "messages" && (
+                      <div className="messages-list">
+                        <h4>Mesazhet</h4>
+                        {messages.length > 0 ? (
+                          messages.map((msg) => (
+                            <article key={msg.id} className="message-card">
+                              <div className="message-card-header">
+                                <strong>{msg.senderName}</strong>
+                                <span className="business-meta">{msg.senderContact}</span>
+                              </div>
+                              <p>{msg.message}</p>
+
+                              {msg.reply ? (
+                                <div className="message-reply">
+                                  <p className="business-meta">Përgjigja jote:</p>
+                                  <p>{msg.reply}</p>
+                                </div>
+                              ) : (
+                                <form
+                                  onSubmit={handleReplySubmit(msg.id)}
+                                  className="message-reply-form"
+                                >
+                                  <textarea
+                                    rows="3"
+                                    value={replyDrafts[msg.id] || ""}
+                                    onChange={(event) =>
+                                      handleReplyChange(msg.id, event.target.value)
+                                    }
+                                    placeholder="Shkruaj një përgjigje..."
+                                  />
+                                  <button
+                                    type="submit"
+                                    className="button button-primary"
+                                    disabled={replySubmittingId === msg.id}
+                                  >
+                                    {replySubmittingId === msg.id
+                                      ? "Duke dërguar..."
+                                      : "Përgjigju"}
+                                  </button>
+                                  {replyFeedback[msg.id] && (
+                                    <p className="form-message">{replyFeedback[msg.id]}</p>
+                                  )}
+                                </form>
+                              )}
+                            </article>
+                          ))
+                        ) : (
+                          <p>Nuk ke ende mesazhe.</p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1925,46 +2123,81 @@ function App() {
 
             <div className="subcategory-row">
               {currentCategory.items.map((item) => (
-                <span key={item} className="subcategory-pill">
+                <button
+                  type="button"
+                  key={item}
+                  className={
+                    selectedSubcategory === item
+                      ? "subcategory-pill active"
+                      : "subcategory-pill"
+                  }
+                  onClick={() =>
+                    setSelectedSubcategory((current) =>
+                      current === item ? null : item,
+                    )
+                  }
+                >
                   {item}
-                </span>
+                </button>
               ))}
             </div>
 
             <div className="section-header">
               <div>
                 <p className="eyebrow">Postimet</p>
-                <h2>Ofertat në {currentCategory.title}</h2>
+                <h2>
+                  Ofertat në {selectedSubcategory || currentCategory.title}
+                </h2>
               </div>
+              {selectedSubcategory && (
+                <button
+                  type="button"
+                  className="button button-secondary"
+                  onClick={() => setSelectedSubcategory(null)}
+                >
+                  Hiq filtrin
+                </button>
+              )}
             </div>
 
             {categoryPosts.length > 0 ? (
               <div className="post-compact-grid">
                 {categoryPosts.map((post) => (
-                  <article
-                    key={post.id}
-                    className="post-compact-card"
-                    onClick={() => handlePostClick(post.id)}
-                  >
-                    <div className="post-compact-thumb">
+                  <article key={post.id} className="post-compact-card">
+                    <a
+                      href={`/postim/${post.id}`}
+                      className="post-compact-thumb"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        handlePostClick(post.id);
+                        handleNavigate(`/postim/${post.id}`);
+                      }}
+                    >
                       {post.photos && post.photos.length > 0 ? (
                         <img src={post.photos[0]} alt={post.title} />
                       ) : (
                         <span aria-hidden="true">{currentCategory.emoji}</span>
                       )}
-                    </div>
+                    </a>
                     <div className="post-compact-body">
                       <span className="tag tag-sm">{post.subcategory}</span>
-                      <h4>{post.title}</h4>
+                      <a
+                        href={`/postim/${post.id}`}
+                        className="post-compact-title-link"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          handlePostClick(post.id);
+                          handleNavigate(`/postim/${post.id}`);
+                        }}
+                      >
+                        <h4>{post.title}</h4>
+                      </a>
                       <p className="post-compact-desc">{post.description}</p>
                       <span className="price price-sm">{formatPrice(post.price)}</span>
                       {post.userId && (
                         <a
                           href={`/profili/${post.userId}`}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleLinkClick(`/profili/${post.userId}`)(event);
-                          }}
+                          onClick={handleLinkClick(`/profili/${post.userId}`)}
                           className="post-compact-link"
                         >
                           Shiko profilin
@@ -1975,7 +2208,7 @@ function App() {
                 ))}
               </div>
             ) : (
-              <p>Nuk ka ende postime në këtë kategori.</p>
+              <p>Nuk ka ende postime në këtë {selectedSubcategory ? "nënkategori" : "kategori"}.</p>
             )}
           </section>
         ) : isProfilePage ? (
@@ -2003,7 +2236,10 @@ function App() {
                     <button
                       type="button"
                       className="button button-primary"
-                      onClick={() => setContactOpen((current) => !current)}
+                      onClick={() => {
+                        setContactTargetId(profileUserId);
+                        setContactOpen((current) => !current);
+                      }}
                     >
                       {contactOpen ? "Mbyll kontaktin" : "Kontakto"}
                     </button>
@@ -2017,51 +2253,7 @@ function App() {
                   </div>
                 </div>
 
-                {contactOpen && (
-                  <div className="auth-card contact-card">
-                    <h3 className="auth-panel-title">Dërgo një ofertë</h3>
-                    <form onSubmit={handleContactSubmit} className="registration-form">
-                      <label>
-                        Emri yt
-                        <input
-                          name="name"
-                          value={contactForm.name}
-                          onChange={handleContactChange}
-                          placeholder="Emri yt"
-                        />
-                      </label>
-                      <label>
-                        Email ose telefon
-                        <input
-                          name="contact"
-                          value={contactForm.contact}
-                          onChange={handleContactChange}
-                          placeholder="email@shembull.com ose +383 4X XXX XXX"
-                        />
-                      </label>
-                      <label>
-                        Mesazhi / oferta
-                        <textarea
-                          name="message"
-                          value={contactForm.message}
-                          onChange={handleContactChange}
-                          rows="4"
-                          placeholder="Shkruaj ofertën ose pyetjen tënde"
-                        />
-                      </label>
-                      <button
-                        type="submit"
-                        className="button button-primary"
-                        disabled={contactSubmitting}
-                      >
-                        {contactSubmitting ? "Duke dërguar..." : "Dërgo mesazhin"}
-                      </button>
-                      {contactMessage && (
-                        <p className="form-message">{contactMessage}</p>
-                      )}
-                    </form>
-                  </div>
-                )}
+                {contactOpen && contactFormPanel}
 
                 <div className="completed-works-list">
                   <h4>Punët e kryera</h4>
@@ -2082,6 +2274,70 @@ function App() {
                     <p>Ky user nuk ka shtuar ende punë të kryera.</p>
                   )}
                 </div>
+              </>
+            )}
+          </section>
+        ) : isPostPage ? (
+          <section className="category-page container">
+            {!currentPost ? (
+              <div className="verify-card">
+                <h2>Postimi nuk u gjet</h2>
+                <a href="/" onClick={handleLinkClick("/")} className="button button-primary">
+                  Kthehu në fillim
+                </a>
+              </div>
+            ) : (
+              <>
+                <div className="section-header">
+                  <div>
+                    <p className="eyebrow">
+                      {currentPost.category} • {currentPost.subcategory}
+                    </p>
+                    <h2>{currentPost.title}</h2>
+                  </div>
+                  <a
+                    href="/"
+                    onClick={handleLinkClick("/")}
+                    className="button button-secondary"
+                  >
+                    Kthehu në fillim
+                  </a>
+                </div>
+
+                {currentPost.photos && currentPost.photos.length > 0 && (
+                  <div className="post-detail-photos">
+                    {currentPost.photos.map((photo, index) => (
+                      <img key={index} src={photo} alt={currentPost.title} />
+                    ))}
+                  </div>
+                )}
+
+                <p>{currentPost.description}</p>
+                <span className="price">{formatPrice(currentPost.price)}</span>
+
+                {currentPost.userId && (
+                  <div className="profile-actions post-detail-actions">
+                    <a
+                      href={`/profili/${currentPost.userId}`}
+                      onClick={handleLinkClick(`/profili/${currentPost.userId}`)}
+                      className="button button-secondary"
+                    >
+                      Shiko profilin
+                    </a>
+                    <button
+                      type="button"
+                      className="button button-primary"
+                      onClick={() => {
+                        setContactTargetId(currentPost.userId);
+                        setContactOpen((current) => !current);
+                      }}
+                    >
+                      {contactOpen ? "Mbyll kontaktin" : "Kontakto"}
+                    </button>
+                  </div>
+                )}
+
+                {contactOpen && contactFormPanel}
               </>
             )}
           </section>
