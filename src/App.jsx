@@ -319,8 +319,8 @@ function App() {
   const [verifyMessage, setVerifyMessage] = useState("Duke verifikuar email-in...");
   const [postForm, setPostForm] = useState({
     title: "",
-    category: categories[0],
-    subcategory: categorySections[0].items[0],
+    category: "",
+    subcategory: "",
     customSubcategory: "",
     type: "Shitje",
     description: "",
@@ -592,7 +592,7 @@ function App() {
   };
 
   const handleCompletedWorkPhotosChange = async (event) => {
-    const files = Array.from(event.target.files || []).slice(0, 3);
+    const files = Array.from(event.target.files || []).slice(0, 5);
     if (files.length === 0) return;
 
     try {
@@ -666,13 +666,10 @@ function App() {
     const { name, value } = event.target;
     setPostForm((current) => {
       if (name === "category") {
-        const section = categorySections.find((item) => item.title === value);
-        const firstSubcategory =
-          section && section.items.length > 0 ? section.items[0] : "Tjetër";
         return {
           ...current,
           category: value,
-          subcategory: firstSubcategory,
+          subcategory: "",
           customSubcategory: "",
         };
       }
@@ -685,7 +682,7 @@ function App() {
 
   const handlePhotoChange = (event) => {
     const files = Array.from(event.target.files || [])
-      .slice(0, 3)
+      .slice(0, 5)
       .map((file) => file.name);
     setPostForm((current) => ({ ...current, photos: files }));
   };
@@ -704,6 +701,16 @@ function App() {
 
     if (!postForm.title || !postForm.description || !postForm.price) {
       setUploadMessage("Ju lutemi plotësoni titullin, përshkrimin dhe çmimin.");
+      return;
+    }
+
+    if (!postForm.category) {
+      setUploadMessage("Ju lutemi zgjidhni kategorinë.");
+      return;
+    }
+
+    if (!postForm.subcategory) {
+      setUploadMessage("Ju lutemi zgjidhni nën-kategorinë.");
       return;
     }
 
@@ -730,8 +737,8 @@ function App() {
     setPosts((current) => [newPost, ...current]);
     setPostForm({
       title: "",
-      category: categories[0],
-      subcategory: categorySections[0].items[0],
+      category: "",
+      subcategory: "",
       customSubcategory: "",
       type: "Shitje",
       description: "",
@@ -1352,12 +1359,12 @@ function App() {
                           </p>
                           <form onSubmit={handlePostSubmit}>
                             <label>
-                              Titulli i postimit
+                              Titulli
                               <input
                                 name="title"
                                 value={postForm.title}
                                 onChange={handlePostChange}
-                                placeholder="P.sh. Apartament 2+1 në qendër"
+                                placeholder="Titulli"
                               />
                             </label>
                             <label>
@@ -1367,6 +1374,9 @@ function App() {
                                 value={postForm.category}
                                 onChange={handlePostChange}
                               >
+                                <option value="" disabled>
+                                  Zgjedh kategorinë
+                                </option>
                                 {categories.map((category) => (
                                   <option key={category} value={category}>
                                     {category}
@@ -1381,6 +1391,9 @@ function App() {
                                 value={postForm.subcategory}
                                 onChange={handlePostChange}
                               >
+                                <option value="" disabled>
+                                  Zgjedh nën-kategorinë
+                                </option>
                                 {(
                                   categorySections.find(
                                     (section) => section.title === postForm.category,
@@ -1436,7 +1449,7 @@ function App() {
                               />
                             </label>
                             <label>
-                              Fotot (maksimumi 3)
+                              Fotot (maksimumi 5)
                               <input
                                 type="file"
                                 multiple
@@ -1485,7 +1498,7 @@ function App() {
                           <p>Ngarkoni deri në 3 foto dhe shpjegoni punën e kryer.</p>
                           <form onSubmit={handleCompletedWorkSubmit}>
                             <label>
-                              Fotot (maksimumi 3)
+                              Fotot (maksimumi 5)
                               <input
                                 type="file"
                                 multiple
