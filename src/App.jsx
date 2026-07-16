@@ -952,6 +952,7 @@ function App() {
     : null;
 
   const [pendingScroll, setPendingScroll] = useState(null);
+  const [pendingSubcategory, setPendingSubcategory] = useState(null);
 
   const handleNavigate = (path) => {
     if (path === route) return;
@@ -962,6 +963,21 @@ function App() {
   const handleLinkClick = (path) => (event) => {
     event.preventDefault();
     handleNavigate(path);
+  };
+
+  const postCategorySection = currentPost
+    ? categorySections.find(
+        (section) => section.title === currentPost.category,
+      )
+    : null;
+
+  const handleBackToPostCategory = () => {
+    if (!postCategorySection) {
+      handleNavigate("/");
+      return;
+    }
+    setPendingSubcategory(currentPost.subcategory || null);
+    handleNavigate(`/${slugify(postCategorySection.title)}`);
   };
 
   const handleSectionLinkClick = (sectionId) => (event) => {
@@ -986,7 +1002,9 @@ function App() {
     setContactForm({ name: "", contact: "", message: "" });
     setContactMessage("");
     setContactTargetId(null);
-    setSelectedSubcategory(null);
+    setSelectedSubcategory(pendingSubcategory);
+    setPendingSubcategory(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route]);
 
   useEffect(() => {
@@ -2295,49 +2313,54 @@ function App() {
                     </p>
                     <h2>{currentPost.title}</h2>
                   </div>
-                  <a
-                    href="/"
-                    onClick={handleLinkClick("/")}
-                    className="button button-secondary"
-                  >
-                    Kthehu në fillim
-                  </a>
+                  {currentPost.userId && (
+                    <div className="profile-actions">
+                      <a
+                        href={`/profili/${currentPost.userId}`}
+                        onClick={handleLinkClick(`/profili/${currentPost.userId}`)}
+                        className="button button-secondary"
+                      >
+                        Shiko profilin
+                      </a>
+                      <button
+                        type="button"
+                        className="button button-primary"
+                        onClick={() => {
+                          setContactTargetId(currentPost.userId);
+                          setContactOpen((current) => !current);
+                        }}
+                      >
+                        {contactOpen ? "Mbyll kontaktin" : "Kontakto"}
+                      </button>
+                    </div>
+                  )}
                 </div>
 
-                {currentPost.photos && currentPost.photos.length > 0 && (
-                  <div className="post-detail-photos">
-                    {currentPost.photos.map((photo, index) => (
-                      <img key={index} src={photo} alt={currentPost.title} />
-                    ))}
-                  </div>
-                )}
+                {contactOpen && contactFormPanel}
 
-                <p>{currentPost.description}</p>
-                <span className="price">{formatPrice(currentPost.price)}</span>
-
-                {currentPost.userId && (
-                  <div className="profile-actions post-detail-actions">
-                    <a
-                      href={`/profili/${currentPost.userId}`}
-                      onClick={handleLinkClick(`/profili/${currentPost.userId}`)}
-                      className="button button-secondary"
-                    >
-                      Shiko profilin
-                    </a>
+                <div className="post-detail-layout">
+                  <div className="post-detail-media">
                     <button
                       type="button"
-                      className="button button-primary"
-                      onClick={() => {
-                        setContactTargetId(currentPost.userId);
-                        setContactOpen((current) => !current);
-                      }}
+                      className="post-detail-back"
+                      onClick={handleBackToPostCategory}
                     >
-                      {contactOpen ? "Mbyll kontaktin" : "Kontakto"}
+                      ← Kthehu
                     </button>
+                    {currentPost.photos && currentPost.photos.length > 0 && (
+                      <div className="post-detail-photos">
+                        {currentPost.photos.map((photo, index) => (
+                          <img key={index} src={photo} alt={currentPost.title} />
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
 
-                {contactOpen && contactFormPanel}
+                  <div className="post-detail-info">
+                    <span className="price">{formatPrice(currentPost.price)}</span>
+                    <p>{currentPost.description}</p>
+                  </div>
+                </div>
               </>
             )}
           </section>
