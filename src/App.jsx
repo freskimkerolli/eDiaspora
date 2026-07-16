@@ -953,6 +953,7 @@ function App() {
 
   const [pendingScroll, setPendingScroll] = useState(null);
   const [pendingSubcategory, setPendingSubcategory] = useState(null);
+  const [activePhotoIndex, setActivePhotoIndex] = useState(0);
 
   const handleNavigate = (path) => {
     if (path === route) return;
@@ -1015,6 +1016,10 @@ function App() {
       document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
     });
   }, [route, pendingScroll]);
+
+  useEffect(() => {
+    setActivePhotoIndex(0);
+  }, [postRouteId]);
 
   useEffect(() => {
     if (!isVerifyPage) return;
@@ -2348,10 +2353,62 @@ function App() {
                       ← Kthehu
                     </button>
                     {currentPost.photos && currentPost.photos.length > 0 && (
-                      <div className="post-detail-photos">
-                        {currentPost.photos.map((photo, index) => (
-                          <img key={index} src={photo} alt={currentPost.title} />
-                        ))}
+                      <div className="post-detail-slider">
+                        <div className="post-detail-slide">
+                          {currentPost.photos.length > 1 && (
+                            <button
+                              type="button"
+                              className="post-detail-slide-arrow post-detail-slide-arrow-prev"
+                              aria-label="Foto e mëparshme"
+                              onClick={() =>
+                                setActivePhotoIndex((current) =>
+                                  current === 0
+                                    ? currentPost.photos.length - 1
+                                    : current - 1,
+                                )
+                              }
+                            >
+                              ‹
+                            </button>
+                          )}
+                          <img
+                            src={currentPost.photos[activePhotoIndex]}
+                            alt={currentPost.title}
+                          />
+                          {currentPost.photos.length > 1 && (
+                            <button
+                              type="button"
+                              className="post-detail-slide-arrow post-detail-slide-arrow-next"
+                              aria-label="Foto tjetër"
+                              onClick={() =>
+                                setActivePhotoIndex((current) =>
+                                  current === currentPost.photos.length - 1
+                                    ? 0
+                                    : current + 1,
+                                )
+                              }
+                            >
+                              ›
+                            </button>
+                          )}
+                        </div>
+                        {currentPost.photos.length > 1 && (
+                          <div className="post-detail-slide-dots">
+                            {currentPost.photos.map((_, index) => (
+                              <button
+                                type="button"
+                                key={index}
+                                className={
+                                  index === activePhotoIndex
+                                    ? "post-detail-slide-dot active"
+                                    : "post-detail-slide-dot"
+                                }
+                                aria-label={`Shko te foto ${index + 1}`}
+                                onClick={() => setActivePhotoIndex(index)}
+                              />
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
