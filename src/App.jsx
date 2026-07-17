@@ -1209,20 +1209,54 @@ function App() {
               Përshtypjet
             </a>
             <span className="main-nav-divider" aria-hidden="true"></span>
-            <a
-              href="/login"
-              className="button button-secondary"
-              onClick={() => setMenuOpen(false)}
-            >
-              Kyçu
-            </a>
-            <a
-              href="/register"
-              className="button button-primary"
-              onClick={() => setMenuOpen(false)}
-            >
-              Regjistrohu
-            </a>
+            {currentUser ? (
+              <>
+                <a
+                  href="/auth"
+                  className="button button-secondary"
+                  onClick={(event) => {
+                    handleLinkClick("/auth")(event);
+                    setMenuOpen(false);
+                  }}
+                >
+                  {currentUser.name}
+                </a>
+                <button
+                  type="button"
+                  className="button button-primary"
+                  onClick={() => {
+                    handleLogout();
+                    setMenuOpen(false);
+                    handleNavigate("/");
+                  }}
+                >
+                  Dil
+                </button>
+              </>
+            ) : (
+              <>
+                <a
+                  href="/login"
+                  className="button button-secondary"
+                  onClick={(event) => {
+                    handleLinkClick("/login")(event);
+                    setMenuOpen(false);
+                  }}
+                >
+                  Kyçu
+                </a>
+                <a
+                  href="/register"
+                  className="button button-primary"
+                  onClick={(event) => {
+                    handleLinkClick("/register")(event);
+                    setMenuOpen(false);
+                  }}
+                >
+                  Regjistrohu
+                </a>
+              </>
+            )}
           </nav>
         </div>
       </header>
