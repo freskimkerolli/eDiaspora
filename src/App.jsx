@@ -1476,7 +1476,7 @@ function App() {
                   </div>
                   <button
                     type="button"
-                    className="button button-secondary"
+                    className="button button-primary"
                     onClick={handleLogout}
                   >
                     Dil
