@@ -1164,7 +1164,7 @@ function App() {
   return (
     <div className="app-shell">
       <header className="site-header">
-        <div className="container header-inner">
+        <div className={`container header-inner${currentUser ? " header-inner-centered" : ""}`}>
           <a href="/" className="logo" onClick={handleLinkClick("/")}>
             <svg
               className="logo-mark"
@@ -1190,21 +1190,7 @@ function App() {
             <span></span>
           </button>
           <nav className={`main-nav ${menuOpen ? "main-nav-open" : ""}`}>
-            {currentUser ? (
-              <>
-                <button
-                  type="button"
-                  className="button button-primary"
-                  onClick={() => {
-                    handleLogout();
-                    setMenuOpen(false);
-                    handleNavigate("/");
-                  }}
-                >
-                  Dil
-                </button>
-              </>
-            ) : (
+            {currentUser ? null : (
               <>
                 <a
                   href="/"

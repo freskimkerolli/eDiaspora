@@ -43,6 +43,10 @@ img {
   padding: 1rem 0;
 }
 
+.header-inner-centered {
+  justify-content: center;
+}
+
 .nav-toggle {
   display: none;
   flex-direction: column;
