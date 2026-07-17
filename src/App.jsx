@@ -2318,30 +2318,7 @@ function App() {
                     </p>
                     <h2>{currentPost.title}</h2>
                   </div>
-                  {currentPost.userId && (
-                    <div className="profile-actions">
-                      <a
-                        href={`/profili/${currentPost.userId}`}
-                        onClick={handleLinkClick(`/profili/${currentPost.userId}`)}
-                        className="button button-secondary"
-                      >
-                        Shiko profilin
-                      </a>
-                      <button
-                        type="button"
-                        className="button button-primary"
-                        onClick={() => {
-                          setContactTargetId(currentPost.userId);
-                          setContactOpen((current) => !current);
-                        }}
-                      >
-                        {contactOpen ? "Mbyll kontaktin" : "Kontakto"}
-                      </button>
-                    </div>
-                  )}
                 </div>
-
-                {contactOpen && contactFormPanel}
 
                 <div className="post-detail-layout">
                   <div className="post-detail-media">
@@ -2414,8 +2391,35 @@ function App() {
                   </div>
 
                   <div className="post-detail-info">
-                    <span className="price">{formatPrice(currentPost.price)}</span>
-                    <p>{currentPost.description}</p>
+                    {currentPost.userId && (
+                      <div className="profile-actions post-detail-info-actions">
+                        <a
+                          href={`/profili/${currentPost.userId}`}
+                          onClick={handleLinkClick(`/profili/${currentPost.userId}`)}
+                          className="button button-secondary"
+                        >
+                          Shiko profilin
+                        </a>
+                        <button
+                          type="button"
+                          className="button button-primary"
+                          onClick={() => {
+                            setContactTargetId(currentPost.userId);
+                            setContactOpen((current) => !current);
+                          }}
+                        >
+                          {contactOpen ? "Mbyll kontaktin" : "Kontakto"}
+                        </button>
+                      </div>
+                    )}
+
+                    {contactOpen && contactFormPanel}
+
+                    <div className="post-detail-box">
+                      <span className="tag">{currentPost.type}</span>
+                      <span className="price">{formatPrice(currentPost.price)}</span>
+                      <p className="post-detail-box-desc">{currentPost.description}</p>
+                    </div>
                   </div>
                 </div>
               </>
