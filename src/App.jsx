@@ -1192,7 +1192,6 @@ function App() {
           <nav className={`main-nav ${menuOpen ? "main-nav-open" : ""}`}>
             {currentUser ? (
               <>
-                <span className="main-nav-admin-title">Admin Panel</span>
                 <button
                   type="button"
                   className="button button-primary"
