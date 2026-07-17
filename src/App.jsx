@@ -1190,37 +1190,9 @@ function App() {
             <span></span>
           </button>
           <nav className={`main-nav ${menuOpen ? "main-nav-open" : ""}`}>
-            <a
-              href="/"
-              onClick={(event) => {
-                handleLinkClick("/")(event);
-                setMenuOpen(false);
-              }}
-            >
-              Ballina
-            </a>
-            <a href="/#categories" onClick={handleSectionLinkClick("categories")}>
-              Kategoritë
-            </a>
-            <a href="/#about" onClick={handleSectionLinkClick("about")}>
-              Rreth nesh
-            </a>
-            <a href="/#testimonials" onClick={handleSectionLinkClick("testimonials")}>
-              Përshtypjet
-            </a>
-            <span className="main-nav-divider" aria-hidden="true"></span>
             {currentUser ? (
               <>
-                <a
-                  href="/auth"
-                  className="button button-secondary"
-                  onClick={(event) => {
-                    handleLinkClick("/auth")(event);
-                    setMenuOpen(false);
-                  }}
-                >
-                  {currentUser.name}
-                </a>
+                <span className="main-nav-admin-title">Admin Panel</span>
                 <button
                   type="button"
                   className="button button-primary"
@@ -1235,6 +1207,25 @@ function App() {
               </>
             ) : (
               <>
+                <a
+                  href="/"
+                  onClick={(event) => {
+                    handleLinkClick("/")(event);
+                    setMenuOpen(false);
+                  }}
+                >
+                  Ballina
+                </a>
+                <a href="/#categories" onClick={handleSectionLinkClick("categories")}>
+                  Kategoritë
+                </a>
+                <a href="/#about" onClick={handleSectionLinkClick("about")}>
+                  Rreth nesh
+                </a>
+                <a href="/#testimonials" onClick={handleSectionLinkClick("testimonials")}>
+                  Përshtypjet
+                </a>
+                <span className="main-nav-divider" aria-hidden="true"></span>
                 <a
                   href="/login"
                   className="button button-secondary"
