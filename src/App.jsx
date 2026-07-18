@@ -339,6 +339,7 @@ function App() {
   });
   const [posts, setPosts] = useState(initialPosts);
   const [uploadMessage, setUploadMessage] = useState("");
+  const [editingPostId, setEditingPostId] = useState(null);
 
   const [completedWorkForm, setCompletedWorkForm] = useState({
     description: "",
@@ -874,20 +875,23 @@ function App() {
     setPostSubmitting(true);
     setUploadMessage("");
     try {
-      const response = await fetch(`${API_URL}/api/posts`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: currentUser.email,
-          title: postForm.title,
-          category: postForm.category,
-          subcategory: resolvedSubcategory,
-          type: postForm.type,
-          description: postForm.description,
-          price: postForm.price,
-          photos: postForm.photos,
-        }),
-      });
+      const response = await fetch(
+        editingPostId ? `${API_URL}/api/posts/${editingPostId}` : `${API_URL}/api/posts`,
+        {
+          method: editingPostId ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: currentUser.email,
+            title: postForm.title,
+            category: postForm.category,
+            subcategory: resolvedSubcategory,
+            type: postForm.type,
+            description: postForm.description,
+            price: postForm.price,
+            photos: postForm.photos,
+          }),
+        },
+      );
       const data = await response.json();
 
       if (!response.ok) {
@@ -895,7 +899,14 @@ function App() {
         return;
       }
 
-      setPosts((current) => [data.post, ...current]);
+      if (editingPostId) {
+        setPosts((current) =>
+          current.map((post) => (post.id === editingPostId ? data.post : post)),
+        );
+        setEditingPostId(null);
+      } else {
+        setPosts((current) => [data.post, ...current]);
+      }
       setPostForm({
         title: "",
         category: "",
@@ -912,6 +923,39 @@ function App() {
     } finally {
       setPostSubmitting(false);
     }
+  };
+
+  const handleEditPostClick = (post) => {
+    const isKnownSubcategory = categorySections
+      .find((section) => section.title === post.category)
+      ?.items.includes(post.subcategory);
+    setEditingPostId(post.id);
+    setPostForm({
+      title: post.title,
+      category: post.category,
+      subcategory: isKnownSubcategory ? post.subcategory : "Tjetër",
+      customSubcategory: isKnownSubcategory ? "" : post.subcategory,
+      type: post.type,
+      description: post.description,
+      price: post.price,
+      photos: post.photos || [],
+    });
+    setUploadMessage("");
+  };
+
+  const handleCancelEditPost = () => {
+    setEditingPostId(null);
+    setPostForm({
+      title: "",
+      category: "",
+      subcategory: "",
+      customSubcategory: "",
+      type: "Shitje",
+      description: "",
+      price: "",
+      photos: [],
+    });
+    setUploadMessage("");
   };
 
   const handlePostClick = (postId) => {
@@ -1706,7 +1750,9 @@ function App() {
                     {dashboardSection === "posts" && (
                       <div>
                         <div className="post-form-card">
-                          <h4>Postoni ofertën tuaj</h4>
+                          <h4>
+                            {editingPostId ? "Ndrysho ofertën" : "Postoni ofertën tuaj"}
+                          </h4>
                           <p>
                             Pas verifikimit të email-it, mund të ngarkoni foto dhe
                             informacion.
@@ -1817,13 +1863,28 @@ function App() {
                                 onChange={handlePhotoChange}
                               />
                             </label>
-                            <button
-                              type="submit"
-                              className="button button-primary"
-                              disabled={postSubmitting}
-                            >
-                              {postSubmitting ? "Duke publikuar..." : "Publiko ofertën"}
-                            </button>
+                            <div className="profile-actions">
+                              <button
+                                type="submit"
+                                className="button button-primary"
+                                disabled={postSubmitting}
+                              >
+                                {postSubmitting
+                                  ? "Duke ruajtur..."
+                                  : editingPostId
+                                    ? "Ruaj ndryshimet"
+                                    : "Publiko ofertën"}
+                              </button>
+                              {editingPostId && (
+                                <button
+                                  type="button"
+                                  className="button button-secondary"
+                                  onClick={handleCancelEditPost}
+                                >
+                                  Anulo
+                                </button>
+                              )}
+                            </div>
                             {uploadMessage && (
                               <p className="form-message">{uploadMessage}</p>
                             )}
@@ -1852,6 +1913,13 @@ function App() {
                                     </p>
                                     <p>{post.description}</p>
                                     <p className="business-meta">Çmimi: {formatPrice(post.price)}</p>
+                                    <button
+                                      type="button"
+                                      className="button button-secondary post-edit-button"
+                                      onClick={() => handleEditPostClick(post)}
+                                    >
+                                      Ndrysho
+                                    </button>
                                   </div>
                                 </article>
                               ))

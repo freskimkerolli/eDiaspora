@@ -11,6 +11,7 @@ import {
   findUserByResetToken,
   updateUser,
   createPost,
+  updatePost,
   listPosts,
   createCompletedWork,
   listCompletedWorksByUser,
@@ -373,6 +374,53 @@ app.post("/api/posts", async (req, res) => {
     });
   } catch (err) {
     console.error("Postimi dështoi:", err.message);
+    return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
+  }
+});
+
+app.put("/api/posts/:id", async (req, res) => {
+  const id = Number(req.params.id);
+  const { email, title, category, subcategory, type, description, price, photos } =
+    req.body || {};
+
+  if (!Number.isInteger(id)) {
+    return res.status(400).json({ error: "ID e postimit nuk është valide." });
+  }
+
+  if (!email || !title || !category || !subcategory || !type || !description || !price) {
+    return res.status(400).json({ error: "Ju lutemi plotësoni të gjitha fushat e postimit." });
+  }
+
+  if (!validPhotos(photos)) {
+    return res.status(413).json({ error: "Fotot janë ose shumë të mëdha ose shumë të shumta." });
+  }
+
+  try {
+    const user = await findUserByEmail(email);
+    if (!user) {
+      return res.status(404).json({ error: "Llogaria nuk u gjet." });
+    }
+
+    const post = await updatePost(id, user.id, {
+      title,
+      category,
+      subcategory,
+      type,
+      description,
+      price,
+      photos: photos || [],
+    });
+
+    if (!post) {
+      return res.status(404).json({ error: "Postimi nuk u gjet." });
+    }
+
+    return res.json({
+      message: "Postimi u përditësua me sukses.",
+      post: { ...post, author: user.name, userType: user.userType },
+    });
+  } catch (err) {
+    console.error("Përditësimi i postimit dështoi:", err.message);
     return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
   }
 });

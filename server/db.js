@@ -150,6 +150,27 @@ export async function createPost(post) {
   return mapPostRow(rows[0]);
 }
 
+export async function updatePost(id, userId, post) {
+  const { rows } = await pool.query(
+    `UPDATE posts SET title = $1, category = $2, subcategory = $3, type = $4,
+       description = $5, price = $6, photos = $7
+     WHERE id = $8 AND user_id = $9
+     RETURNING *`,
+    [
+      post.title,
+      post.category,
+      post.subcategory,
+      post.type,
+      post.description,
+      post.price,
+      post.photos,
+      id,
+      userId,
+    ],
+  );
+  return mapPostRow(rows[0]);
+}
+
 export async function listPosts({ category } = {}) {
   if (category) {
     const { rows } = await pool.query(

@@ -591,6 +591,10 @@ img {
   background: #f9faf8;
 }
 
+.post-edit-button {
+  margin-top: 0.75rem;
+}
+
 .messages-list {
   display: grid;
   gap: 1rem;
