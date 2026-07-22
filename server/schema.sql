@@ -65,3 +65,69 @@ create table if not exists contact_messages (
 );
 
 create index if not exists contact_messages_recipient_idx on contact_messages (recipient_user_id);
+
+-- Thread token lets the anonymous sender (no account) view/reply to a thread
+alter table contact_messages add column if not exists thread_token text;
+create unique index if not exists contact_messages_thread_token_idx on contact_messages (thread_token);
+
+-- Multi-message thread on top of a contact_messages "conversation"
+create table if not exists message_replies (
+  id serial primary key,
+  contact_message_id integer not null references contact_messages(id) on delete cascade,
+  sender text not null check (sender in ('recipient', 'sender')),
+  body text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists message_replies_message_idx on message_replies (contact_message_id);
+
+-- Admin flag + business trust badge (separate from email verification)
+alter table users add column if not exists is_admin boolean not null default false;
+alter table users add column if not exists business_verified boolean not null default false;
+
+-- Location, promotion and lifecycle fields for listings
+alter table posts add column if not exists city text;
+alter table posts add column if not exists country text;
+alter table posts add column if not exists featured boolean not null default false;
+alter table posts add column if not exists expires_at timestamptz not null default (now() + interval '60 days');
+alter table posts add column if not exists status text not null default 'active';
+alter table posts add column if not exists renewed_at timestamptz;
+
+create index if not exists posts_city_idx on posts (city);
+create index if not exists posts_featured_idx on posts (featured);
+create index if not exists posts_status_idx on posts (status);
+
+-- Favorites (saved listings)
+create table if not exists favorites (
+  id serial primary key,
+  user_id integer not null references users(id) on delete cascade,
+  post_id integer not null references posts(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique (user_id, post_id)
+);
+
+create index if not exists favorites_user_idx on favorites (user_id);
+
+-- Reviews / ratings left on a business's public profile
+create table if not exists reviews (
+  id serial primary key,
+  target_user_id integer not null references users(id) on delete cascade,
+  reviewer_name text not null,
+  rating integer not null check (rating between 1 and 5),
+  comment text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists reviews_target_idx on reviews (target_user_id);
+
+-- Reports / flags on listings, for moderation
+create table if not exists reports (
+  id serial primary key,
+  post_id integer not null references posts(id) on delete cascade,
+  reporter_name text,
+  reason text not null,
+  status text not null default 'pending',
+  created_at timestamptz not null default now()
+);
+
+create index if not exists reports_status_idx on reports (status);

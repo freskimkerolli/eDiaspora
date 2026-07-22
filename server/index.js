@@ -13,18 +13,44 @@ import {
   createPost,
   updatePost,
   listPosts,
+  findPostById,
+  listPostsByUser,
+  setPostFeatured,
+  renewPost,
+  expireOverduePosts,
+  deletePost,
+  incrementPostClicks,
   createCompletedWork,
   listCompletedWorksByUser,
   createContactMessage,
   listContactMessagesByUser,
   findContactMessageById,
   replyToContactMessage,
+  setContactMessageThreadToken,
+  findContactMessageByThreadToken,
+  addMessageReply,
+  listMessageReplies,
+  addFavorite,
+  removeFavorite,
+  listFavoritePostsByUser,
+  listFavoritePostIdsByUser,
+  createReview,
+  listReviewsByUser,
+  getReviewSummary,
+  createReport,
+  listReports,
+  setReportStatus,
+  listAllUsers,
+  listAllPostsForAdmin,
 } from "./db.js";
 import {
   sendVerificationEmail,
   sendPasswordResetEmail,
   sendContactMessage,
   sendContactReplyEmail,
+  sendThreadStartedEmail,
+  sendThreadReplyEmail,
+  sendReviewNotificationEmail,
   isEmail,
 } from "./mailer.js";
 
@@ -64,7 +90,15 @@ function publicProfile(user) {
     company: user.company,
     userType: user.userType,
     avatarUrl: user.avatarUrl,
+    businessVerified: user.businessVerified,
   };
+}
+
+async function requireAdmin(email) {
+  if (!email) return null;
+  const user = await findUserByEmail(email);
+  if (!user || !user.isAdmin) return null;
+  return user;
 }
 
 function validPhotos(photos) {
@@ -322,10 +356,16 @@ app.post("/api/reset-password", async (req, res) => {
 });
 
 app.get("/api/posts", async (req, res) => {
-  const { category } = req.query;
+  const { category, city, minPrice, maxPrice, search } = req.query;
 
   try {
-    const posts = await listPosts({ category: category || undefined });
+    const posts = await listPosts({
+      category: category || undefined,
+      city: city || undefined,
+      search: search || undefined,
+      minPrice: minPrice !== undefined && minPrice !== "" ? Number(minPrice) : undefined,
+      maxPrice: maxPrice !== undefined && maxPrice !== "" ? Number(maxPrice) : undefined,
+    });
     return res.json({ posts });
   } catch (err) {
     console.error("Marrja e postimeve dështoi:", err.message);
@@ -333,8 +373,26 @@ app.get("/api/posts", async (req, res) => {
   }
 });
 
+app.post("/api/posts/:id/click", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) {
+    return res.status(400).json({ error: "ID e postimit nuk është valide." });
+  }
+
+  try {
+    const post = await incrementPostClicks(id);
+    if (!post) {
+      return res.status(404).json({ error: "Postimi nuk u gjet." });
+    }
+    return res.json({ post });
+  } catch (err) {
+    console.error("Regjistrimi i klikimit dështoi:", err.message);
+    return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
+  }
+});
+
 app.post("/api/posts", async (req, res) => {
-  const { email, title, category, subcategory, type, description, price, photos } =
+  const { email, title, category, subcategory, type, description, price, photos, city, country } =
     req.body || {};
 
   if (!email || !title || !category || !subcategory || !type || !description || !price) {
@@ -366,6 +424,8 @@ app.post("/api/posts", async (req, res) => {
       description,
       price,
       photos: photos || [],
+      city,
+      country,
     });
 
     return res.status(201).json({
@@ -380,7 +440,7 @@ app.post("/api/posts", async (req, res) => {
 
 app.put("/api/posts/:id", async (req, res) => {
   const id = Number(req.params.id);
-  const { email, title, category, subcategory, type, description, price, photos } =
+  const { email, title, category, subcategory, type, description, price, photos, city, country } =
     req.body || {};
 
   if (!Number.isInteger(id)) {
@@ -409,6 +469,8 @@ app.put("/api/posts/:id", async (req, res) => {
       description,
       price,
       photos: photos || [],
+      city,
+      country,
     });
 
     if (!post) {
@@ -421,6 +483,152 @@ app.put("/api/posts/:id", async (req, res) => {
     });
   } catch (err) {
     console.error("Përditësimi i postimit dështoi:", err.message);
+    return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
+  }
+});
+
+app.post("/api/posts/:id/renew", async (req, res) => {
+  const id = Number(req.params.id);
+  const { email } = req.body || {};
+
+  if (!Number.isInteger(id)) {
+    return res.status(400).json({ error: "ID e postimit nuk është valide." });
+  }
+  if (!email) {
+    return res.status(400).json({ error: "Mungon email-i i llogarisë." });
+  }
+
+  try {
+    const user = await findUserByEmail(email);
+    if (!user) {
+      return res.status(404).json({ error: "Llogaria nuk u gjet." });
+    }
+
+    const post = await renewPost(id, user.id);
+    if (!post) {
+      return res.status(404).json({ error: "Postimi nuk u gjet." });
+    }
+
+    return res.json({ message: "Shpallja u rinovua për 60 ditë të tjera.", post });
+  } catch (err) {
+    console.error("Rinovimi i postimit dështoi:", err.message);
+    return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
+  }
+});
+
+app.delete("/api/posts/:id", async (req, res) => {
+  const id = Number(req.params.id);
+  const { email } = req.query;
+
+  if (!Number.isInteger(id)) {
+    return res.status(400).json({ error: "ID e postimit nuk është valide." });
+  }
+
+  try {
+    const user = await findUserByEmail(email);
+    if (!user) {
+      return res.status(404).json({ error: "Llogaria nuk u gjet." });
+    }
+
+    const post = await findPostById(id);
+    if (!post || post.userId !== user.id) {
+      return res.status(404).json({ error: "Postimi nuk u gjet." });
+    }
+
+    await deletePost(id);
+    return res.json({ message: "Postimi u fshi." });
+  } catch (err) {
+    console.error("Fshirja e postimit dështoi:", err.message);
+    return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
+  }
+});
+
+app.post("/api/posts/:id/report", async (req, res) => {
+  const id = Number(req.params.id);
+  const { reporterName, reason } = req.body || {};
+
+  if (!Number.isInteger(id)) {
+    return res.status(400).json({ error: "ID e postimit nuk është valide." });
+  }
+  if (!reason || !reason.trim()) {
+    return res.status(400).json({ error: "Ju lutemi shkruani arsyen e raportimit." });
+  }
+  if (reason.length > 1000) {
+    return res.status(400).json({ error: "Arsyeja është shumë e gjatë." });
+  }
+
+  try {
+    const post = await findPostById(id);
+    if (!post) {
+      return res.status(404).json({ error: "Postimi nuk u gjet." });
+    }
+
+    const report = await createReport({ postId: id, reporterName, reason });
+    return res.status(201).json({ message: "Faleminderit, raportimi u dërgua te ekipi ynë.", report });
+  } catch (err) {
+    console.error("Raportimi dështoi:", err.message);
+    return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
+  }
+});
+
+app.get("/api/users/:id/reviews", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) {
+    return res.status(400).json({ error: "ID e llogarisë nuk është valide." });
+  }
+
+  try {
+    const [reviews, summary] = await Promise.all([
+      listReviewsByUser(id),
+      getReviewSummary(id),
+    ]);
+    return res.json({ reviews, summary });
+  } catch (err) {
+    console.error("Marrja e vlerësimeve dështoi:", err.message);
+    return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
+  }
+});
+
+app.post("/api/users/:id/reviews", async (req, res) => {
+  const id = Number(req.params.id);
+  const { reviewerName, rating, comment } = req.body || {};
+  const numericRating = Number(rating);
+
+  if (!Number.isInteger(id)) {
+    return res.status(400).json({ error: "ID e llogarisë nuk është valide." });
+  }
+  if (!reviewerName || !reviewerName.trim()) {
+    return res.status(400).json({ error: "Ju lutemi shkruani emrin tuaj." });
+  }
+  if (!Number.isInteger(numericRating) || numericRating < 1 || numericRating > 5) {
+    return res.status(400).json({ error: "Vlerësimi duhet të jetë nga 1 deri në 5." });
+  }
+  if (comment && comment.length > 2000) {
+    return res.status(400).json({ error: "Komenti është shumë i gjatë." });
+  }
+
+  try {
+    const user = await findUserById(id);
+    if (!user) {
+      return res.status(404).json({ error: "Llogaria nuk u gjet." });
+    }
+
+    const review = await createReview({
+      targetUserId: id,
+      reviewerName: reviewerName.trim(),
+      rating: numericRating,
+      comment: comment ? comment.trim() : null,
+    });
+
+    try {
+      await sendReviewNotificationEmail(user.email, user.name, reviewerName, numericRating, comment);
+    } catch (err) {
+      console.error("Dërgimi i njoftimit të vlerësimit dështoi:", err.message);
+    }
+
+    return res.status(201).json({ message: "Faleminderit për vlerësimin.", review });
+  } catch (err) {
+    console.error("Shtimi i vlerësimit dështoi:", err.message);
     return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
   }
 });
@@ -476,17 +684,94 @@ app.post("/api/users/:id/contact", async (req, res) => {
       message,
     });
 
+    const threadToken = crypto.randomBytes(24).toString("hex");
+    await setContactMessageThreadToken(saved.id, threadToken);
+
     try {
       await sendContactMessage(user.email, user.name, name, contact, message);
     } catch (err) {
       console.error("Dërgimi i email-it të kontaktit dështoi:", err.message);
     }
 
-    return res
-      .status(201)
-      .json({ message: "Mesazhi u dërgua me sukses.", contactMessage: saved });
+    if (isEmail(contact)) {
+      try {
+        const threadUrl = `${FRONTEND_URL}/biseda/${threadToken}`;
+        await sendThreadStartedEmail(contact, name, threadUrl);
+      } catch (err) {
+        console.error("Dërgimi i email-it të bisedës dështoi:", err.message);
+      }
+    }
+
+    return res.status(201).json({
+      message: "Mesazhi u dërgua me sukses.",
+      contactMessage: { ...saved, threadToken },
+    });
   } catch (err) {
     console.error("Ruajtja e mesazhit dështoi:", err.message);
+    return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
+  }
+});
+
+app.get("/api/threads/:token", async (req, res) => {
+  const { token } = req.params;
+
+  try {
+    const thread = await findContactMessageByThreadToken(token);
+    if (!thread) {
+      return res.status(404).json({ error: "Biseda nuk u gjet." });
+    }
+
+    const [replies, recipient] = await Promise.all([
+      listMessageReplies(thread.id),
+      findUserById(thread.recipientUserId),
+    ]);
+
+    return res.json({
+      thread: { ...thread, recipientName: recipient ? recipient.name : null },
+      replies,
+    });
+  } catch (err) {
+    console.error("Marrja e bisedës dështoi:", err.message);
+    return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
+  }
+});
+
+app.post("/api/threads/:token/reply", async (req, res) => {
+  const { token } = req.params;
+  const { body } = req.body || {};
+
+  if (!body || !body.trim()) {
+    return res.status(400).json({ error: "Shkruaj një përgjigje para se ta dërgosh." });
+  }
+  if (body.length > 4000) {
+    return res.status(400).json({ error: "Mesazhi është shumë i gjatë." });
+  }
+
+  try {
+    const thread = await findContactMessageByThreadToken(token);
+    if (!thread) {
+      return res.status(404).json({ error: "Biseda nuk u gjet." });
+    }
+
+    const reply = await addMessageReply({
+      contactMessageId: thread.id,
+      sender: "sender",
+      body: body.trim(),
+    });
+
+    const recipient = await findUserById(thread.recipientUserId);
+    if (recipient) {
+      try {
+        const threadUrl = `${FRONTEND_URL}/panel`;
+        await sendThreadReplyEmail(recipient.email, recipient.name, thread.senderName, body, threadUrl);
+      } catch (err) {
+        console.error("Dërgimi i njoftimit dështoi:", err.message);
+      }
+    }
+
+    return res.status(201).json({ message: "Mesazhi u dërgua.", reply });
+  } catch (err) {
+    console.error("Dërgimi i mesazhit dështoi:", err.message);
     return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
   }
 });
@@ -508,6 +793,33 @@ app.get("/api/messages", async (req, res) => {
     return res.json({ messages });
   } catch (err) {
     console.error("Marrja e mesazheve dështoi:", err.message);
+    return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
+  }
+});
+
+app.get("/api/messages/:id", async (req, res) => {
+  const id = Number(req.params.id);
+  const { email } = req.query;
+
+  if (!Number.isInteger(id)) {
+    return res.status(400).json({ error: "ID e mesazhit nuk është valide." });
+  }
+
+  try {
+    const existing = await findContactMessageById(id);
+    if (!existing) {
+      return res.status(404).json({ error: "Mesazhi nuk u gjet." });
+    }
+
+    const user = await findUserByEmail(email);
+    if (!user || user.id !== existing.recipientUserId) {
+      return res.status(403).json({ error: "Nuk keni qasje në këtë mesazh." });
+    }
+
+    const replies = await listMessageReplies(id);
+    return res.json({ contactMessage: existing, replies });
+  } catch (err) {
+    console.error("Marrja e mesazhit dështoi:", err.message);
     return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
   }
 });
@@ -540,22 +852,38 @@ app.post("/api/messages/:id/reply", async (req, res) => {
     }
 
     const updated = await replyToContactMessage(id, reply);
+    const replyRecord = await addMessageReply({
+      contactMessageId: id,
+      sender: "recipient",
+      body: reply,
+    });
 
     if (isEmail(existing.senderContact)) {
       try {
-        await sendContactReplyEmail(
-          existing.senderContact,
-          existing.senderName,
-          user.name,
-          reply,
-          existing.message,
-        );
+        const threadUrl = existing.threadToken
+          ? `${FRONTEND_URL}/biseda/${existing.threadToken}`
+          : undefined;
+        if (threadUrl) {
+          await sendThreadReplyEmail(existing.senderContact, existing.senderName, user.name, reply, threadUrl);
+        } else {
+          await sendContactReplyEmail(
+            existing.senderContact,
+            existing.senderName,
+            user.name,
+            reply,
+            existing.message,
+          );
+        }
       } catch (err) {
         console.error("Dërgimi i përgjigjes me email dështoi:", err.message);
       }
     }
 
-    return res.json({ message: "Përgjigja u dërgua me sukses.", contactMessage: updated });
+    return res.json({
+      message: "Përgjigja u dërgua me sukses.",
+      contactMessage: updated,
+      reply: replyRecord,
+    });
   } catch (err) {
     console.error("Dërgimi i përgjigjes dështoi:", err.message);
     return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
@@ -616,9 +944,259 @@ app.post("/api/completed-works", async (req, res) => {
   }
 });
 
+app.get("/api/favorites", async (req, res) => {
+  const { email } = req.query;
+  if (!email) {
+    return res.status(400).json({ error: "Mungon email-i i llogarisë." });
+  }
+
+  try {
+    const user = await findUserByEmail(email);
+    if (!user) {
+      return res.status(404).json({ error: "Llogaria nuk u gjet." });
+    }
+
+    const posts = await listFavoritePostsByUser(user.id);
+    return res.json({ posts });
+  } catch (err) {
+    console.error("Marrja e të preferuarave dështoi:", err.message);
+    return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
+  }
+});
+
+app.post("/api/favorites", async (req, res) => {
+  const { email, postId } = req.body || {};
+  const id = Number(postId);
+
+  if (!email || !Number.isInteger(id)) {
+    return res.status(400).json({ error: "Kërkesë e pavlefshme." });
+  }
+
+  try {
+    const user = await findUserByEmail(email);
+    if (!user) {
+      return res.status(404).json({ error: "Llogaria nuk u gjet." });
+    }
+
+    await addFavorite(user.id, id);
+    const postIds = await listFavoritePostIdsByUser(user.id);
+    return res.status(201).json({ message: "U shtua te të preferuarat.", postIds });
+  } catch (err) {
+    console.error("Shtimi te të preferuarat dështoi:", err.message);
+    return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
+  }
+});
+
+app.delete("/api/favorites/:postId", async (req, res) => {
+  const postId = Number(req.params.postId);
+  const { email } = req.query;
+
+  if (!email || !Number.isInteger(postId)) {
+    return res.status(400).json({ error: "Kërkesë e pavlefshme." });
+  }
+
+  try {
+    const user = await findUserByEmail(email);
+    if (!user) {
+      return res.status(404).json({ error: "Llogaria nuk u gjet." });
+    }
+
+    await removeFavorite(user.id, postId);
+    const postIds = await listFavoritePostIdsByUser(user.id);
+    return res.json({ message: "U hoq nga të preferuarat.", postIds });
+  } catch (err) {
+    console.error("Heqja nga të preferuarat dështoi:", err.message);
+    return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
+  }
+});
+
+app.get("/api/dashboard/stats", async (req, res) => {
+  const { email } = req.query;
+  if (!email) {
+    return res.status(400).json({ error: "Mungon email-i i llogarisë." });
+  }
+
+  try {
+    const user = await findUserByEmail(email);
+    if (!user) {
+      return res.status(404).json({ error: "Llogaria nuk u gjet." });
+    }
+
+    const [posts, messages, reviewSummary] = await Promise.all([
+      listPostsByUser(user.id),
+      listContactMessagesByUser(user.id),
+      getReviewSummary(user.id),
+    ]);
+
+    const totalClicks = posts.reduce((sum, post) => sum + (post.clicks || 0), 0);
+
+    return res.json({
+      stats: {
+        postCount: posts.length,
+        totalClicks,
+        messageCount: messages.length,
+        reviewCount: reviewSummary.count,
+        averageRating: reviewSummary.average,
+      },
+      posts,
+    });
+  } catch (err) {
+    console.error("Marrja e statistikave dështoi:", err.message);
+    return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
+  }
+});
+
+// --- Admin ---
+
+app.get("/api/admin/users", async (req, res) => {
+  const admin = await requireAdmin(req.query.email);
+  if (!admin) {
+    return res.status(403).json({ error: "Nuk keni qasje admin." });
+  }
+
+  try {
+    const users = await listAllUsers();
+    return res.json({ users: users.map(publicUser) });
+  } catch (err) {
+    console.error("Marrja e përdoruesve dështoi:", err.message);
+    return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
+  }
+});
+
+app.put("/api/admin/users/:id/verify-business", async (req, res) => {
+  const admin = await requireAdmin(req.body?.email);
+  if (!admin) {
+    return res.status(403).json({ error: "Nuk keni qasje admin." });
+  }
+
+  const id = Number(req.params.id);
+  const { businessVerified } = req.body || {};
+  if (!Number.isInteger(id)) {
+    return res.status(400).json({ error: "ID e llogarisë nuk është valide." });
+  }
+
+  try {
+    const updated = await updateUser(id, { businessVerified: Boolean(businessVerified) });
+    if (!updated) {
+      return res.status(404).json({ error: "Llogaria nuk u gjet." });
+    }
+    return res.json({ message: "U përditësua statusi i verifikimit.", user: publicUser(updated) });
+  } catch (err) {
+    console.error("Përditësimi i verifikimit dështoi:", err.message);
+    return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
+  }
+});
+
+app.get("/api/admin/posts", async (req, res) => {
+  const admin = await requireAdmin(req.query.email);
+  if (!admin) {
+    return res.status(403).json({ error: "Nuk keni qasje admin." });
+  }
+
+  try {
+    const posts = await listAllPostsForAdmin();
+    return res.json({ posts });
+  } catch (err) {
+    console.error("Marrja e postimeve dështoi:", err.message);
+    return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
+  }
+});
+
+app.put("/api/admin/posts/:id/feature", async (req, res) => {
+  const admin = await requireAdmin(req.body?.email);
+  if (!admin) {
+    return res.status(403).json({ error: "Nuk keni qasje admin." });
+  }
+
+  const id = Number(req.params.id);
+  const { featured } = req.body || {};
+  if (!Number.isInteger(id)) {
+    return res.status(400).json({ error: "ID e postimit nuk është valide." });
+  }
+
+  try {
+    const post = await setPostFeatured(id, Boolean(featured));
+    if (!post) {
+      return res.status(404).json({ error: "Postimi nuk u gjet." });
+    }
+    return res.json({ message: "U përditësua statusi i promovimit.", post });
+  } catch (err) {
+    console.error("Përditësimi i promovimit dështoi:", err.message);
+    return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
+  }
+});
+
+app.delete("/api/admin/posts/:id", async (req, res) => {
+  const admin = await requireAdmin(req.query.email);
+  if (!admin) {
+    return res.status(403).json({ error: "Nuk keni qasje admin." });
+  }
+
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) {
+    return res.status(400).json({ error: "ID e postimit nuk është valide." });
+  }
+
+  try {
+    await deletePost(id);
+    return res.json({ message: "Postimi u fshi." });
+  } catch (err) {
+    console.error("Fshirja e postimit dështoi:", err.message);
+    return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
+  }
+});
+
+app.get("/api/admin/reports", async (req, res) => {
+  const admin = await requireAdmin(req.query.email);
+  if (!admin) {
+    return res.status(403).json({ error: "Nuk keni qasje admin." });
+  }
+
+  try {
+    const reports = await listReports({ status: req.query.status || undefined });
+    return res.json({ reports });
+  } catch (err) {
+    console.error("Marrja e raporteve dështoi:", err.message);
+    return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
+  }
+});
+
+app.put("/api/admin/reports/:id", async (req, res) => {
+  const admin = await requireAdmin(req.body?.email);
+  if (!admin) {
+    return res.status(403).json({ error: "Nuk keni qasje admin." });
+  }
+
+  const id = Number(req.params.id);
+  const { status } = req.body || {};
+  if (!Number.isInteger(id) || !["pending", "resolved", "dismissed"].includes(status)) {
+    return res.status(400).json({ error: "Kërkesë e pavlefshme." });
+  }
+
+  try {
+    const report = await setReportStatus(id, status);
+    if (!report) {
+      return res.status(404).json({ error: "Raporti nuk u gjet." });
+    }
+    return res.json({ message: "Statusi i raportit u përditësua.", report });
+  } catch (err) {
+    console.error("Përditësimi i raportit dështoi:", err.message);
+    return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
+  }
+});
+
 app.get("/api/health", (req, res) => {
   res.json({ ok: true });
 });
+
+expireOverduePosts().catch((err) =>
+  console.error("Skadimi automatik i shpalljeve dështoi:", err.message),
+);
+setInterval(() => {
+  expireOverduePosts().catch((err) =>
+    console.error("Skadimi automatik i shpalljeve dështoi:", err.message),
+  );
+}, 60 * 60 * 1000);
 
 app.listen(PORT, () => {
   console.log(`eDiaspora API po dëgjon në http://localhost:${PORT}`);

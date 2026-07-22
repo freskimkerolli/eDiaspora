@@ -138,6 +138,125 @@ export async function sendContactReplyEmail(to, toName, fromName, reply, origina
   return data;
 }
 
+export async function sendThreadStartedEmail(to, toName, threadUrl) {
+  if (!resend) {
+    console.log(
+      `[dev] RESEND_API_KEY nuk është vendosur. Link i bisedës për ${to}:\n${threadUrl}`,
+    );
+    return { simulated: true };
+  }
+
+  const from = process.env.EMAIL_FROM || "eDiaspora <onboarding@resend.dev>";
+  const safeToName = escapeHtml(toName);
+
+  const { data, error } = await resend.emails.send({
+    from,
+    to,
+    subject: "Mesazhi yt u dërgua - eDiaspora",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+        <h2 style="color:#111;">Përshëndetje ${safeToName},</h2>
+        <p style="color:#4b5563;">
+          Mesazhi yt u dërgua me sukses. Kur të marrësh një përgjigje, mund ta shikosh
+          dhe të vazhdosh bisedën këtu, pa pasur nevojë për llogari.
+        </p>
+        <p style="text-align:center; margin: 2rem 0;">
+          <a href="${threadUrl}"
+             style="background:#111; color:#fff; padding:0.9rem 1.5rem; border-radius:999px; text-decoration:none; font-weight:600;">
+            Shiko bisedën
+          </a>
+        </p>
+      </div>
+    `,
+  });
+
+  if (error) {
+    throw new Error(error.message || "Dërgimi i email-it dështoi.");
+  }
+
+  return data;
+}
+
+export async function sendThreadReplyEmail(to, toName, fromName, body, threadUrl) {
+  if (!resend) {
+    console.log(
+      `[dev] RESEND_API_KEY nuk është vendosur. Përgjigje e re nga ${fromName} për ${to}:\n${body}\nLink: ${threadUrl}`,
+    );
+    return { simulated: true };
+  }
+
+  const from = process.env.EMAIL_FROM || "eDiaspora <onboarding@resend.dev>";
+  const safeToName = escapeHtml(toName);
+  const safeFromName = escapeHtml(fromName);
+  const safeBody = escapeHtml(body);
+
+  const { data, error } = await resend.emails.send({
+    from,
+    to,
+    subject: `${safeFromName} të është përgjigjur - eDiaspora`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+        <h2 style="color:#111;">Përshëndetje ${safeToName},</h2>
+        <p style="color:#4b5563;">
+          <strong>${safeFromName}</strong> të ka dërguar një mesazh të ri në bisedën tuaj në eDiaspora.
+        </p>
+        <p style="color:#111; white-space: pre-wrap;">${safeBody}</p>
+        ${
+          threadUrl
+            ? `<p style="text-align:center; margin: 2rem 0;">
+                 <a href="${threadUrl}"
+                    style="background:#111; color:#fff; padding:0.9rem 1.5rem; border-radius:999px; text-decoration:none; font-weight:600;">
+                   Shiko bisedën
+                 </a>
+               </p>`
+            : ""
+        }
+      </div>
+    `,
+  });
+
+  if (error) {
+    throw new Error(error.message || "Dërgimi i email-it dështoi.");
+  }
+
+  return data;
+}
+
+export async function sendReviewNotificationEmail(to, toName, reviewerName, rating, comment) {
+  if (!resend) {
+    console.log(
+      `[dev] RESEND_API_KEY nuk është vendosur. Vlerësim i ri (${rating}/5) nga ${reviewerName} për ${to}.`,
+    );
+    return { simulated: true };
+  }
+
+  const from = process.env.EMAIL_FROM || "eDiaspora <onboarding@resend.dev>";
+  const safeToName = escapeHtml(toName);
+  const safeReviewerName = escapeHtml(reviewerName);
+  const safeComment = comment ? escapeHtml(comment) : "";
+
+  const { data, error } = await resend.emails.send({
+    from,
+    to,
+    subject: `Vlerësim i ri (${rating}/5) - eDiaspora`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+        <h2 style="color:#111;">Përshëndetje ${safeToName},</h2>
+        <p style="color:#4b5563;">
+          <strong>${safeReviewerName}</strong> të la një vlerësim ${"⭐".repeat(rating)} (${rating}/5) në profilin tënd në eDiaspora.
+        </p>
+        ${safeComment ? `<p style="color:#111; white-space: pre-wrap;">"${safeComment}"</p>` : ""}
+      </div>
+    `,
+  });
+
+  if (error) {
+    throw new Error(error.message || "Dërgimi i email-it dështoi.");
+  }
+
+  return data;
+}
+
 export async function sendPasswordResetEmail(to, name, resetUrl) {
   if (!resend) {
     console.log(
