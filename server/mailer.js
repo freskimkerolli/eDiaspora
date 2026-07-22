@@ -257,6 +257,75 @@ export async function sendReviewNotificationEmail(to, toName, reviewerName, rati
   return data;
 }
 
+export async function sendOrderCreatedEmail(to, buyerName, orderLabel, amount, referenceCode) {
+  if (!resend) {
+    console.log(
+      `[dev] RESEND_API_KEY nuk është vendosur. Porosi e re nga ${buyerName}: ${orderLabel} (${amount}€, ref ${referenceCode}).`,
+    );
+    return { simulated: true };
+  }
+
+  const from = process.env.EMAIL_FROM || "eDiaspora <onboarding@resend.dev>";
+  const safeBuyerName = escapeHtml(buyerName);
+  const safeOrderLabel = escapeHtml(orderLabel);
+  const safeRef = escapeHtml(referenceCode);
+
+  const { data, error } = await resend.emails.send({
+    from,
+    to,
+    subject: `Porosi e re për konfirmim (${amount}€) - eDiaspora`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+        <h2 style="color:#111;">Porosi e re</h2>
+        <p style="color:#4b5563;">
+          <strong>${safeBuyerName}</strong> ka kërkuar: <strong>${safeOrderLabel}</strong> (${amount}€).
+        </p>
+        <p style="color:#111;">Referenca: <strong>${safeRef}</strong></p>
+        <p style="color:#4b5563;">Kontrollo transfertën në llogarinë OneFor dhe konfirmoje te paneli Admin.</p>
+      </div>
+    `,
+  });
+
+  if (error) {
+    throw new Error(error.message || "Dërgimi i email-it dështoi.");
+  }
+
+  return data;
+}
+
+export async function sendOrderConfirmedEmail(to, name, orderLabel) {
+  if (!resend) {
+    console.log(
+      `[dev] RESEND_API_KEY nuk është vendosur. Porosia "${orderLabel}" u konfirmua për ${to}.`,
+    );
+    return { simulated: true };
+  }
+
+  const from = process.env.EMAIL_FROM || "eDiaspora <onboarding@resend.dev>";
+  const safeName = escapeHtml(name);
+  const safeOrderLabel = escapeHtml(orderLabel);
+
+  const { data, error } = await resend.emails.send({
+    from,
+    to,
+    subject: "Pagesa u konfirmua - eDiaspora",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+        <h2 style="color:#111;">Përshëndetje ${safeName},</h2>
+        <p style="color:#4b5563;">
+          Pagesa jote për <strong>${safeOrderLabel}</strong> u konfirmua dhe tashmë është aktive.
+        </p>
+      </div>
+    `,
+  });
+
+  if (error) {
+    throw new Error(error.message || "Dërgimi i email-it dështoi.");
+  }
+
+  return data;
+}
+
 export async function sendPasswordResetEmail(to, name, resetUrl) {
   if (!resend) {
     console.log(

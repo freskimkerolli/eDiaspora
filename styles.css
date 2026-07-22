@@ -1324,6 +1324,35 @@ img {
   margin-top: 1rem;
 }
 
+.plan-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.plan-card {
+  padding: 1.25rem;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  display: grid;
+  gap: 0.6rem;
+  align-content: start;
+}
+
+.plan-card select {
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid rgba(17, 24, 39, 0.14);
+  font: inherit;
+}
+
+.payment-instructions {
+  border: 1px solid rgba(201, 146, 47, 0.4);
+  background: rgba(201, 146, 47, 0.06);
+}
+
 .link-button {
   border: none;
   background: none;

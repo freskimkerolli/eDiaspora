@@ -131,3 +131,25 @@ create table if not exists reports (
 );
 
 create index if not exists reports_status_idx on reports (status);
+
+-- Paid plans: featured listings, business subscription, one-off verification.
+-- Payment is by bank transfer + manual admin confirmation (no card gateway yet).
+alter table posts add column if not exists featured_until timestamptz;
+alter table users add column if not exists subscription_expires_at timestamptz;
+
+create table if not exists orders (
+  id serial primary key,
+  user_id integer not null references users(id) on delete cascade,
+  type text not null check (type in ('featured_listing', 'subscription', 'verification')),
+  post_id integer references posts(id) on delete set null,
+  amount numeric(10,2) not null,
+  reference_code text not null unique,
+  status text not null default 'pending',
+  note text,
+  rejected_reason text,
+  created_at timestamptz not null default now(),
+  confirmed_at timestamptz
+);
+
+create index if not exists orders_status_idx on orders (status);
+create index if not exists orders_user_idx on orders (user_id);

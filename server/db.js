@@ -27,6 +27,7 @@ function mapRow(row) {
     resetTokenExpires: row.reset_token_expires,
     isAdmin: row.is_admin,
     businessVerified: row.business_verified,
+    subscriptionExpiresAt: row.subscription_expires_at,
     createdAt: row.created_at,
   };
 }
@@ -94,6 +95,7 @@ export async function updateUser(id, updates) {
     resetTokenExpires: "reset_token_expires",
     isAdmin: "is_admin",
     businessVerified: "business_verified",
+    subscriptionExpiresAt: "subscription_expires_at",
   };
 
   const fields = [];
@@ -134,6 +136,7 @@ function mapPostRow(row) {
     city: row.city,
     country: row.country,
     featured: row.featured,
+    featuredUntil: row.featured_until,
     expiresAt: row.expires_at,
     status: row.status,
     renewedAt: row.renewed_at,
@@ -240,10 +243,41 @@ export async function listPostsByUser(userId) {
 
 export async function setPostFeatured(id, featured) {
   const { rows } = await pool.query(
-    "UPDATE posts SET featured = $1 WHERE id = $2 RETURNING *",
+    "UPDATE posts SET featured = $1, featured_until = NULL WHERE id = $2 RETURNING *",
     [featured, id],
   );
   return mapPostRow(rows[0]);
+}
+
+export async function activateFeaturedListing(id, days) {
+  const { rows } = await pool.query(
+    `UPDATE posts SET featured = true, featured_until = now() + ($1 || ' days')::interval
+     WHERE id = $2 RETURNING *`,
+    [days, id],
+  );
+  return mapPostRow(rows[0]);
+}
+
+export async function expireFeaturedListings() {
+  await pool.query(
+    "UPDATE posts SET featured = false WHERE featured = true AND featured_until IS NOT NULL AND featured_until < now()",
+  );
+}
+
+export async function extendSubscription(userId, days) {
+  const { rows } = await pool.query(
+    `UPDATE users
+     SET subscription_expires_at = GREATEST(COALESCE(subscription_expires_at, now()), now()) + ($1 || ' days')::interval
+     WHERE id = $2
+     RETURNING *`,
+    [days, userId],
+  );
+  return mapRow(rows[0]);
+}
+
+export async function findAdmins() {
+  const { rows } = await pool.query("SELECT * FROM users WHERE is_admin = true");
+  return rows.map(mapRow);
 }
 
 export async function renewPost(id, userId) {
@@ -529,4 +563,74 @@ export async function listAllPostsForAdmin() {
     "SELECT * FROM posts ORDER BY created_at DESC",
   );
   return rows.map(mapPostRow);
+}
+
+// --- Orders (bank-transfer payments) ---
+
+function mapOrderRow(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    userId: row.user_id,
+    type: row.type,
+    postId: row.post_id,
+    amount: Number(row.amount),
+    referenceCode: row.reference_code,
+    status: row.status,
+    note: row.note,
+    rejectedReason: row.rejected_reason,
+    createdAt: row.created_at,
+    confirmedAt: row.confirmed_at,
+  };
+}
+
+export async function createOrder(order) {
+  const { rows } = await pool.query(
+    `INSERT INTO orders (user_id, type, post_id, amount, reference_code, note)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING *`,
+    [order.userId, order.type, order.postId || null, order.amount, order.referenceCode, order.note || null],
+  );
+  return mapOrderRow(rows[0]);
+}
+
+export async function findOrderById(id) {
+  const { rows } = await pool.query("SELECT * FROM orders WHERE id = $1", [id]);
+  return mapOrderRow(rows[0]);
+}
+
+export async function listOrdersByUser(userId) {
+  const { rows } = await pool.query(
+    "SELECT * FROM orders WHERE user_id = $1 ORDER BY created_at DESC",
+    [userId],
+  );
+  return rows.map(mapOrderRow);
+}
+
+export async function listOrders({ status } = {}) {
+  if (status) {
+    const { rows } = await pool.query(
+      "SELECT * FROM orders WHERE status = $1 ORDER BY created_at DESC",
+      [status],
+    );
+    return rows.map(mapOrderRow);
+  }
+  const { rows } = await pool.query("SELECT * FROM orders ORDER BY created_at DESC");
+  return rows.map(mapOrderRow);
+}
+
+export async function confirmOrder(id) {
+  const { rows } = await pool.query(
+    "UPDATE orders SET status = 'confirmed', confirmed_at = now() WHERE id = $1 AND status = 'pending' RETURNING *",
+    [id],
+  );
+  return mapOrderRow(rows[0]);
+}
+
+export async function rejectOrder(id, reason) {
+  const { rows } = await pool.query(
+    "UPDATE orders SET status = 'rejected', rejected_reason = $1 WHERE id = $2 AND status = 'pending' RETURNING *",
+    [reason || null, id],
+  );
+  return mapOrderRow(rows[0]);
 }

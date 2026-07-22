@@ -428,7 +428,16 @@ function App() {
   const [adminUsers, setAdminUsers] = useState([]);
   const [adminPosts, setAdminPosts] = useState([]);
   const [adminReports, setAdminReports] = useState([]);
+  const [adminOrders, setAdminOrders] = useState([]);
   const [adminMessage, setAdminMessage] = useState("");
+
+  const [pricing, setPricing] = useState(null);
+  const [bankDetails, setBankDetails] = useState(null);
+  const [myOrders, setMyOrders] = useState([]);
+  const [featuredPostChoice, setFeaturedPostChoice] = useState("");
+  const [orderSubmittingType, setOrderSubmittingType] = useState(null);
+  const [orderMessage, setOrderMessage] = useState("");
+  const [lastOrder, setLastOrder] = useState(null);
 
   const authHandleChange = (event) => {
     const { name, value } = event.target;
@@ -1224,11 +1233,111 @@ function App() {
         const response = await fetch(`${API_URL}/api/admin/posts?email=${email}`);
         const data = await response.json();
         if (response.ok) setAdminPosts(data.posts || []);
+      } else if (tab === "orders") {
+        const response = await fetch(`${API_URL}/api/admin/orders?email=${email}`);
+        const data = await response.json();
+        if (response.ok) setAdminOrders(data.orders || []);
       }
     } catch (err) {
       // ignore
     }
   };
+
+  const handleConfirmOrder = async (orderId) => {
+    if (!currentUser) return;
+    try {
+      const response = await fetch(`${API_URL}/api/admin/orders/${orderId}/confirm`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: currentUser.email }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setAdminOrders((current) =>
+          current.map((order) => (order.id === orderId ? data.order : order)),
+        );
+      }
+      setAdminMessage(data.message || data.error);
+    } catch (err) {
+      // ignore
+    }
+  };
+
+  const handleRejectOrder = async (orderId) => {
+    if (!currentUser) return;
+    try {
+      const response = await fetch(`${API_URL}/api/admin/orders/${orderId}/reject`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: currentUser.email }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setAdminOrders((current) =>
+          current.map((order) => (order.id === orderId ? data.order : order)),
+        );
+      }
+      setAdminMessage(data.message || data.error);
+    } catch (err) {
+      // ignore
+    }
+  };
+
+  const openPaymentsSection = async () => {
+    setDashboardSection("payments");
+    setOrderMessage("");
+    setLastOrder(null);
+    if (!currentUser) return;
+    try {
+      const [pricingResponse, ordersResponse] = await Promise.all([
+        fetch(`${API_URL}/api/pricing`),
+        fetch(`${API_URL}/api/orders?email=${encodeURIComponent(currentUser.email)}`),
+      ]);
+      const pricingData = await pricingResponse.json();
+      const ordersData = await ordersResponse.json();
+      setPricing(pricingData.pricing || null);
+      setBankDetails(pricingData.bankDetails || null);
+      setMyOrders(Array.isArray(ordersData.orders) ? ordersData.orders : []);
+    } catch (err) {
+      // ignore
+    }
+  };
+
+  const handleBuyPlan = async (type) => {
+    if (!currentUser) return;
+    if (type === "featured_listing" && !featuredPostChoice) {
+      setOrderMessage("Zgjidh një shpallje për ta promovuar.");
+      return;
+    }
+    setOrderSubmittingType(type);
+    setOrderMessage("");
+    try {
+      const response = await fetch(`${API_URL}/api/orders`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: currentUser.email,
+          type,
+          postId: type === "featured_listing" ? Number(featuredPostChoice) : undefined,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setOrderMessage(data.error || "Krijimi i porosisë dështoi.");
+        return;
+      }
+      setLastOrder(data.order);
+      setMyOrders((current) => [data.order, ...current]);
+      setOrderMessage(data.message);
+    } catch (err) {
+      setOrderMessage("Nuk u arrit lidhja me serverin. Provoni përsëri.");
+    } finally {
+      setOrderSubmittingType(null);
+    }
+  };
+
+  const orderStatusLabel = (status) =>
+    status === "confirmed" ? "Konfirmuar" : status === "rejected" ? "Refuzuar" : "Në pritje";
 
   const handleSetAdminTab = (tab) => {
     setAdminTab(tab);
@@ -2026,6 +2135,17 @@ function App() {
                     >
                       Statistikat
                     </button>
+                    <button
+                      type="button"
+                      className={
+                        dashboardSection === "payments"
+                          ? "dashboard-nav-item active"
+                          : "dashboard-nav-item"
+                      }
+                      onClick={openPaymentsSection}
+                    >
+                      Pagesat
+                    </button>
                     {currentUser.isAdmin && (
                       <a
                         href="/admin"
@@ -2628,6 +2748,127 @@ function App() {
                         ) : (
                           <p>Duke ngarkuar statistikat...</p>
                         )}
+                      </div>
+                    )}
+
+                    {dashboardSection === "payments" && (
+                      <div className="posts-list">
+                        <h4>Pagesat</h4>
+                        <p className="business-meta">
+                          Pagesat bëhen me transfertë bankare (OneFor) dhe aktivizohen brenda pak
+                          orësh pasi ekipi ynë e konfirmon transfertën.
+                        </p>
+
+                        {pricing && (
+                          <div className="plan-grid">
+                            <article className="plan-card">
+                              <h4>{pricing.featured_listing.label}</h4>
+                              <p className="price">{pricing.featured_listing.amount}€</p>
+                              <select
+                                value={featuredPostChoice}
+                                onChange={(event) => setFeaturedPostChoice(event.target.value)}
+                              >
+                                <option value="">Zgjidh shpalljen</option>
+                                {posts
+                                  .filter((post) => post.userId === currentUser.id)
+                                  .map((post) => (
+                                    <option key={post.id} value={post.id}>
+                                      {post.title}
+                                    </option>
+                                  ))}
+                              </select>
+                              <button
+                                type="button"
+                                className="button button-primary"
+                                disabled={orderSubmittingType === "featured_listing"}
+                                onClick={() => handleBuyPlan("featured_listing")}
+                              >
+                                {orderSubmittingType === "featured_listing" ? "Duke krijuar..." : "Promovo"}
+                              </button>
+                            </article>
+
+                            {currentUser.userType === "business" && (
+                              <>
+                                <article className="plan-card">
+                                  <h4>{pricing.subscription.label}</h4>
+                                  <p className="price">{pricing.subscription.amount}€/muaj</p>
+                                  <p className="business-meta">
+                                    Shpallje pa limit, prioritet dhe badge verifikimi i përfshirë.
+                                  </p>
+                                  <button
+                                    type="button"
+                                    className="button button-primary"
+                                    disabled={orderSubmittingType === "subscription"}
+                                    onClick={() => handleBuyPlan("subscription")}
+                                  >
+                                    {orderSubmittingType === "subscription" ? "Duke krijuar..." : "Abonohu"}
+                                  </button>
+                                </article>
+
+                                <article className="plan-card">
+                                  <h4>{pricing.verification.label}</h4>
+                                  <p className="price">{pricing.verification.amount}€</p>
+                                  <p className="business-meta">
+                                    Merr badge-in "✓ Verifikuar" në profilin tënd publik.
+                                  </p>
+                                  <button
+                                    type="button"
+                                    className="button button-primary"
+                                    disabled={orderSubmittingType === "verification"}
+                                    onClick={() => handleBuyPlan("verification")}
+                                  >
+                                    {orderSubmittingType === "verification" ? "Duke krijuar..." : "Verifikohu"}
+                                  </button>
+                                </article>
+                              </>
+                            )}
+                          </div>
+                        )}
+
+                        {orderMessage && <p className="form-message">{orderMessage}</p>}
+
+                        {lastOrder && bankDetails && (
+                          <div className="post-form-card payment-instructions">
+                            <h4>Udhëzime për transfertën</h4>
+                            <p>Shuma: <strong>{lastOrder.amount}€</strong></p>
+                            <p>Banka: <strong>{bankDetails.bankName}</strong></p>
+                            <p>IBAN: <strong>{bankDetails.iban}</strong></p>
+                            <p>Mbajtësi: <strong>{bankDetails.holder}</strong></p>
+                            <p>
+                              Referenca (shkruaje patjetër te përshkrimi i transfertës):{" "}
+                              <strong>{lastOrder.referenceCode}</strong>
+                            </p>
+                            <p className="business-meta">
+                              Plani aktivizohet automatikisht sapo ekipi ynë ta konfirmojë pagesën.
+                            </p>
+                          </div>
+                        )}
+
+                        <div className="posts-list">
+                          <h4>Porositë e mia</h4>
+                          {myOrders.length > 0 ? (
+                            myOrders.map((order) => (
+                              <article key={order.id} className="business-card">
+                                <div>
+                                  <p className="business-meta">
+                                    {order.type === "featured_listing"
+                                      ? "Shpallje e promovuar"
+                                      : order.type === "subscription"
+                                        ? "Abonim mujor"
+                                        : "Verifikim biznesi"}{" "}
+                                    • {order.amount}€ • {orderStatusLabel(order.status)}
+                                  </p>
+                                  <p className="business-meta">Referenca: {order.referenceCode}</p>
+                                  {order.status === "rejected" && order.rejectedReason && (
+                                    <p className="business-meta">Arsyeja: {order.rejectedReason}</p>
+                                  )}
+                                </div>
+                              </article>
+                            ))
+                          ) : (
+                            <p>Nuk ke ende porosi.</p>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -3330,6 +3571,13 @@ function App() {
                   >
                     Postimet
                   </button>
+                  <button
+                    type="button"
+                    className={adminTab === "orders" ? "dashboard-tab active" : "dashboard-tab"}
+                    onClick={() => handleSetAdminTab("orders")}
+                  >
+                    Pagesat
+                  </button>
                 </div>
 
                 {adminMessage && <p className="form-message">{adminMessage}</p>}
@@ -3400,6 +3648,58 @@ function App() {
                         )}
                       </article>
                     ))}
+                  </div>
+                )}
+
+                {adminTab === "orders" && (
+                  <div className="messages-list">
+                    {adminOrders.length > 0 ? (
+                      adminOrders.map((order) => (
+                        <article key={order.id} className="message-card">
+                          <div className="message-card-header">
+                            <strong>
+                              {order.type === "featured_listing"
+                                ? "Shpallje e promovuar"
+                                : order.type === "subscription"
+                                  ? "Abonim mujor"
+                                  : "Verifikim biznesi"}
+                            </strong>
+                            <span className="business-meta">{orderStatusLabel(order.status)}</span>
+                          </div>
+                          <p className="business-meta">
+                            Përdoruesi #{order.userId} • {order.amount}€ • Ref: {order.referenceCode}
+                          </p>
+                          {order.postId && (
+                            <a
+                              href={`/postim/${order.postId}`}
+                              onClick={handleLinkClick(`/postim/${order.postId}`)}
+                            >
+                              Shiko shpalljen
+                            </a>
+                          )}
+                          {order.status === "pending" && (
+                            <div className="profile-actions">
+                              <button
+                                type="button"
+                                className="button button-primary"
+                                onClick={() => handleConfirmOrder(order.id)}
+                              >
+                                Konfirmo pagesën
+                              </button>
+                              <button
+                                type="button"
+                                className="button button-secondary"
+                                onClick={() => handleRejectOrder(order.id)}
+                              >
+                                Refuzo
+                              </button>
+                            </div>
+                          )}
+                        </article>
+                      ))
+                    ) : (
+                      <p>Nuk ka porosi.</p>
+                    )}
                   </div>
                 )}
 

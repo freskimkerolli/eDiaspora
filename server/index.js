@@ -16,6 +16,10 @@ import {
   findPostById,
   listPostsByUser,
   setPostFeatured,
+  activateFeaturedListing,
+  expireFeaturedListings,
+  extendSubscription,
+  findAdmins,
   renewPost,
   expireOverduePosts,
   deletePost,
@@ -42,6 +46,12 @@ import {
   setReportStatus,
   listAllUsers,
   listAllPostsForAdmin,
+  createOrder,
+  findOrderById,
+  listOrdersByUser,
+  listOrders,
+  confirmOrder,
+  rejectOrder,
 } from "./db.js";
 import {
   sendVerificationEmail,
@@ -51,6 +61,8 @@ import {
   sendThreadStartedEmail,
   sendThreadReplyEmail,
   sendReviewNotificationEmail,
+  sendOrderCreatedEmail,
+  sendOrderConfirmedEmail,
   isEmail,
 } from "./mailer.js";
 
@@ -64,6 +76,20 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || FRONTEND_URL)
 const MAX_AVATAR_LENGTH = 2_000_000; // ~1.5MB image as base64
 const MAX_PHOTO_LENGTH = 1_000_000; // ~750KB per resized listing/portfolio photo
 const MAX_PHOTOS = 5;
+
+// Bank-transfer payment plans. No card gateway yet - orders are confirmed
+// manually by an admin after checking the OneFor account.
+const BANK_DETAILS = {
+  bankName: "OneFor",
+  iban: "XK055001000084909646",
+  holder: "eDiaspora",
+};
+
+const PRICING = {
+  featured_listing: { amount: 10, days: 14, label: "Shpallje e promovuar (14 ditë)" },
+  subscription: { amount: 15, days: 30, label: "Abonim mujor biznesi" },
+  verification: { amount: 10, days: null, label: "Verifikim biznesi" },
+};
 
 app.use(
   cors({
@@ -1046,7 +1072,182 @@ app.get("/api/dashboard/stats", async (req, res) => {
   }
 });
 
+app.get("/api/pricing", (req, res) => {
+  res.json({ pricing: PRICING, bankDetails: BANK_DETAILS });
+});
+
+app.get("/api/orders", async (req, res) => {
+  const { email } = req.query;
+  if (!email) {
+    return res.status(400).json({ error: "Mungon email-i i llogarisë." });
+  }
+
+  try {
+    const user = await findUserByEmail(email);
+    if (!user) {
+      return res.status(404).json({ error: "Llogaria nuk u gjet." });
+    }
+
+    const orders = await listOrdersByUser(user.id);
+    return res.json({ orders });
+  } catch (err) {
+    console.error("Marrja e porosive dështoi:", err.message);
+    return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
+  }
+});
+
+app.post("/api/orders", async (req, res) => {
+  const { email, type, postId } = req.body || {};
+
+  if (!email || !PRICING[type]) {
+    return res.status(400).json({ error: "Kërkesë e pavlefshme." });
+  }
+
+  try {
+    const user = await findUserByEmail(email);
+    if (!user) {
+      return res.status(404).json({ error: "Llogaria nuk u gjet." });
+    }
+
+    if ((type === "subscription" || type === "verification") && user.userType !== "business") {
+      return res.status(403).json({ error: "Vetëm llogaritë e biznesit mund të blejnë këtë plan." });
+    }
+
+    let resolvedPostId = null;
+    if (type === "featured_listing") {
+      const id = Number(postId);
+      if (!Number.isInteger(id)) {
+        return res.status(400).json({ error: "Zgjidh një shpallje për ta promovuar." });
+      }
+      const post = await findPostById(id);
+      if (!post || post.userId !== user.id) {
+        return res.status(404).json({ error: "Shpallja nuk u gjet." });
+      }
+      resolvedPostId = id;
+    }
+
+    const plan = PRICING[type];
+    const referenceCode = `ED-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
+
+    const order = await createOrder({
+      userId: user.id,
+      type,
+      postId: resolvedPostId,
+      amount: plan.amount,
+      referenceCode,
+    });
+
+    try {
+      const admins = await findAdmins();
+      await Promise.all(
+        admins.map((admin) =>
+          sendOrderCreatedEmail(admin.email, user.name, plan.label, plan.amount, referenceCode),
+        ),
+      );
+    } catch (err) {
+      console.error("Njoftimi i adminëve dështoi:", err.message);
+    }
+
+    return res.status(201).json({
+      message: "Porosia u krijua. Ndiqni udhëzimet për transfertën bankare.",
+      order,
+      bankDetails: BANK_DETAILS,
+    });
+  } catch (err) {
+    console.error("Krijimi i porosisë dështoi:", err.message);
+    return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
+  }
+});
+
 // --- Admin ---
+
+app.get("/api/admin/orders", async (req, res) => {
+  const admin = await requireAdmin(req.query.email);
+  if (!admin) {
+    return res.status(403).json({ error: "Nuk keni qasje admin." });
+  }
+
+  try {
+    const orders = await listOrders({ status: req.query.status || undefined });
+    return res.json({ orders });
+  } catch (err) {
+    console.error("Marrja e porosive dështoi:", err.message);
+    return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
+  }
+});
+
+app.put("/api/admin/orders/:id/confirm", async (req, res) => {
+  const admin = await requireAdmin(req.body?.email);
+  if (!admin) {
+    return res.status(403).json({ error: "Nuk keni qasje admin." });
+  }
+
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) {
+    return res.status(400).json({ error: "ID e porosisë nuk është valide." });
+  }
+
+  try {
+    const existing = await findOrderById(id);
+    if (!existing) {
+      return res.status(404).json({ error: "Porosia nuk u gjet." });
+    }
+    if (existing.status !== "pending") {
+      return res.status(409).json({ error: "Kjo porosi është trajtuar tashmë." });
+    }
+
+    const plan = PRICING[existing.type];
+    const buyer = await findUserById(existing.userId);
+
+    if (existing.type === "featured_listing" && existing.postId) {
+      await activateFeaturedListing(existing.postId, plan.days);
+    } else if (existing.type === "subscription") {
+      await extendSubscription(existing.userId, plan.days);
+      await updateUser(existing.userId, { businessVerified: true });
+    } else if (existing.type === "verification") {
+      await updateUser(existing.userId, { businessVerified: true });
+    }
+
+    const order = await confirmOrder(id);
+
+    if (buyer) {
+      try {
+        await sendOrderConfirmedEmail(buyer.email, buyer.name, plan.label);
+      } catch (err) {
+        console.error("Dërgimi i email-it të konfirmimit dështoi:", err.message);
+      }
+    }
+
+    return res.json({ message: "Porosia u konfirmua dhe plani u aktivizua.", order });
+  } catch (err) {
+    console.error("Konfirmimi i porosisë dështoi:", err.message);
+    return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
+  }
+});
+
+app.put("/api/admin/orders/:id/reject", async (req, res) => {
+  const admin = await requireAdmin(req.body?.email);
+  if (!admin) {
+    return res.status(403).json({ error: "Nuk keni qasje admin." });
+  }
+
+  const id = Number(req.params.id);
+  const { reason } = req.body || {};
+  if (!Number.isInteger(id)) {
+    return res.status(400).json({ error: "ID e porosisë nuk është valide." });
+  }
+
+  try {
+    const order = await rejectOrder(id, reason);
+    if (!order) {
+      return res.status(404).json({ error: "Porosia nuk u gjet ose është trajtuar tashmë." });
+    }
+    return res.json({ message: "Porosia u refuzua.", order });
+  } catch (err) {
+    console.error("Refuzimi i porosisë dështoi:", err.message);
+    return res.status(500).json({ error: "Diçka shkoi keq. Provoni përsëri." });
+  }
+});
 
 app.get("/api/admin/users", async (req, res) => {
   const admin = await requireAdmin(req.query.email);
@@ -1189,14 +1390,17 @@ app.get("/api/health", (req, res) => {
   res.json({ ok: true });
 });
 
-expireOverduePosts().catch((err) =>
-  console.error("Skadimi automatik i shpalljeve dështoi:", err.message),
-);
-setInterval(() => {
+function runExpiryJobs() {
   expireOverduePosts().catch((err) =>
     console.error("Skadimi automatik i shpalljeve dështoi:", err.message),
   );
-}, 60 * 60 * 1000);
+  expireFeaturedListings().catch((err) =>
+    console.error("Skadimi automatik i promovimeve dështoi:", err.message),
+  );
+}
+
+runExpiryJobs();
+setInterval(runExpiryJobs, 60 * 60 * 1000);
 
 app.listen(PORT, () => {
   console.log(`eDiaspora API po dëgjon në http://localhost:${PORT}`);
