@@ -336,6 +336,8 @@ function App() {
     description: "",
     price: "",
     photos: [],
+    city: "",
+    country: "",
   });
   const [posts, setPosts] = useState(initialPosts);
   const [uploadMessage, setUploadMessage] = useState("");
@@ -390,6 +392,43 @@ function App() {
   const [profileMessage, setProfileMessage] = useState("");
   const [profileError, setProfileError] = useState(false);
   const [profileSubmitting, setProfileSubmitting] = useState(false);
+
+  const [favoritePostIds, setFavoritePostIds] = useState([]);
+  const [favoritePosts, setFavoritePosts] = useState([]);
+
+  const [filterCity, setFilterCity] = useState("");
+  const [filterMinPrice, setFilterMinPrice] = useState("");
+  const [filterMaxPrice, setFilterMaxPrice] = useState("");
+  const [filterSearch, setFilterSearch] = useState("");
+
+  const [reviews, setReviews] = useState([]);
+  const [reviewSummary, setReviewSummary] = useState({ count: 0, average: 0 });
+  const [reviewForm, setReviewForm] = useState({ reviewerName: "", rating: 5, comment: "" });
+  const [reviewMessage, setReviewMessage] = useState("");
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [reportMessage, setReportMessage] = useState("");
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+
+  const [activeThreadId, setActiveThreadId] = useState(null);
+  const [activeThreadReplies, setActiveThreadReplies] = useState([]);
+
+  const [threadPageStatus, setThreadPageStatus] = useState("loading");
+  const [threadPageData, setThreadPageData] = useState(null);
+  const [threadPageReplies, setThreadPageReplies] = useState([]);
+  const [threadPageDraft, setThreadPageDraft] = useState("");
+  const [threadPageSubmitting, setThreadPageSubmitting] = useState(false);
+  const [threadPageMessage, setThreadPageMessage] = useState("");
+
+  const [dashboardStats, setDashboardStats] = useState(null);
+
+  const [adminTab, setAdminTab] = useState("reports");
+  const [adminUsers, setAdminUsers] = useState([]);
+  const [adminPosts, setAdminPosts] = useState([]);
+  const [adminReports, setAdminReports] = useState([]);
+  const [adminMessage, setAdminMessage] = useState("");
 
   const authHandleChange = (event) => {
     const { name, value } = event.target;
@@ -761,6 +800,9 @@ function App() {
       setMessages((current) =>
         current.map((msg) => (msg.id === messageId ? data.contactMessage : msg)),
       );
+      if (activeThreadId === messageId && data.reply) {
+        setActiveThreadReplies((current) => [...current, data.reply]);
+      }
       setReplyDrafts((current) => ({ ...current, [messageId]: "" }));
       setReplyFeedback((current) => ({ ...current, [messageId]: data.message }));
     } catch (err) {
@@ -889,6 +931,8 @@ function App() {
             description: postForm.description,
             price: postForm.price,
             photos: postForm.photos,
+            city: postForm.city,
+            country: postForm.country,
           }),
         },
       );
@@ -916,6 +960,8 @@ function App() {
         description: "",
         price: "",
         photos: [],
+        city: "",
+        country: "",
       });
       setUploadMessage(data.message);
     } catch (err) {
@@ -939,6 +985,8 @@ function App() {
       description: post.description,
       price: post.price,
       photos: post.photos || [],
+      city: post.city || "",
+      country: post.country || "",
     });
     setUploadMessage("");
   };
@@ -954,6 +1002,8 @@ function App() {
       description: "",
       price: "",
       photos: [],
+      city: "",
+      country: "",
     });
     setUploadMessage("");
   };
@@ -964,6 +1014,301 @@ function App() {
         post.id === postId ? { ...post, clicks: post.clicks + 1 } : post,
       ),
     );
+    if (typeof postId === "number") {
+      fetch(`${API_URL}/api/posts/${postId}/click`, { method: "POST" }).catch(() => {});
+    }
+  };
+
+  const isFavorite = (postId) => favoritePostIds.includes(postId);
+
+  const handleToggleFavorite = async (postId) => {
+    if (!currentUser) {
+      handleNavigate("/login");
+      return;
+    }
+    const alreadyFavorite = isFavorite(postId);
+    setFavoritePostIds((current) =>
+      alreadyFavorite ? current.filter((id) => id !== postId) : [...current, postId],
+    );
+    try {
+      const response = await fetch(
+        alreadyFavorite
+          ? `${API_URL}/api/favorites/${postId}?email=${encodeURIComponent(currentUser.email)}`
+          : `${API_URL}/api/favorites`,
+        {
+          method: alreadyFavorite ? "DELETE" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: alreadyFavorite ? undefined : JSON.stringify({ email: currentUser.email, postId }),
+        },
+      );
+      const data = await response.json();
+      if (response.ok && Array.isArray(data.postIds)) {
+        setFavoritePostIds(data.postIds);
+      }
+    } catch (err) {
+      // revert on failure
+      setFavoritePostIds((current) =>
+        alreadyFavorite ? [...current, postId] : current.filter((id) => id !== postId),
+      );
+    }
+  };
+
+  const openFavoritesSection = async () => {
+    setDashboardSection("favorites");
+    if (!currentUser) return;
+    try {
+      const response = await fetch(
+        `${API_URL}/api/favorites?email=${encodeURIComponent(currentUser.email)}`,
+      );
+      const data = await response.json();
+      setFavoritePosts(Array.isArray(data.posts) ? data.posts : []);
+    } catch (err) {
+      setFavoritePosts([]);
+    }
+  };
+
+  const openStatsSection = async () => {
+    setDashboardSection("stats");
+    if (!currentUser) return;
+    try {
+      const response = await fetch(
+        `${API_URL}/api/dashboard/stats?email=${encodeURIComponent(currentUser.email)}`,
+      );
+      const data = await response.json();
+      if (response.ok) {
+        setDashboardStats(data.stats);
+      }
+    } catch (err) {
+      setDashboardStats(null);
+    }
+  };
+
+  const handleRenewPost = async (postId) => {
+    if (!currentUser) return;
+    try {
+      const response = await fetch(`${API_URL}/api/posts/${postId}/renew`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: currentUser.email }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setPosts((current) => current.map((post) => (post.id === postId ? data.post : post)));
+      }
+    } catch (err) {
+      // ignore
+    }
+  };
+
+  const handleReviewChange = (event) => {
+    const { name, value } = event.target;
+    setReviewForm((current) => ({ ...current, [name]: value }));
+  };
+
+  const handleReviewSubmit = (targetUserId) => async (event) => {
+    event.preventDefault();
+    if (!reviewForm.reviewerName.trim()) {
+      setReviewMessage("Ju lutemi shkruani emrin tuaj.");
+      return;
+    }
+    setReviewSubmitting(true);
+    setReviewMessage("");
+    try {
+      const response = await fetch(`${API_URL}/api/users/${targetUserId}/reviews`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(reviewForm),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setReviewMessage(data.error || "Vlerësimi dështoi.");
+        return;
+      }
+      setReviews((current) => [data.review, ...current]);
+      setReviewSummary((current) => ({
+        count: current.count + 1,
+        average:
+          (current.average * current.count + Number(reviewForm.rating)) /
+          (current.count + 1),
+      }));
+      setReviewForm({ reviewerName: "", rating: 5, comment: "" });
+      setReviewMessage(data.message);
+    } catch (err) {
+      setReviewMessage("Nuk u arrit lidhja me serverin. Provoni përsëri.");
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
+  const handleReportSubmit = (postId) => async (event) => {
+    event.preventDefault();
+    if (!reportReason.trim()) {
+      setReportMessage("Shkruaj arsyen e raportimit.");
+      return;
+    }
+    setReportSubmitting(true);
+    setReportMessage("");
+    try {
+      const response = await fetch(`${API_URL}/api/posts/${postId}/report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reporterName: currentUser?.name, reason: reportReason }),
+      });
+      const data = await response.json();
+      setReportMessage(data.message || data.error);
+      if (response.ok) {
+        setReportReason("");
+      }
+    } catch (err) {
+      setReportMessage("Nuk u arrit lidhja me serverin. Provoni përsëri.");
+    } finally {
+      setReportSubmitting(false);
+    }
+  };
+
+  const openMessageThread = async (messageId) => {
+    setActiveThreadId((current) => (current === messageId ? null : messageId));
+    if (activeThreadId === messageId) return;
+    try {
+      const response = await fetch(
+        `${API_URL}/api/messages/${messageId}?email=${encodeURIComponent(currentUser.email)}`,
+      );
+      const data = await response.json();
+      if (response.ok) {
+        setActiveThreadReplies(data.replies || []);
+      }
+    } catch (err) {
+      setActiveThreadReplies([]);
+    }
+  };
+
+  const handleThreadPageReply = async (event) => {
+    event.preventDefault();
+    if (!threadPageDraft.trim() || !threadPageData) return;
+    setThreadPageSubmitting(true);
+    setThreadPageMessage("");
+    try {
+      const token = window.location.pathname.split("/biseda/")[1];
+      const response = await fetch(`${API_URL}/api/threads/${token}/reply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body: threadPageDraft }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setThreadPageMessage(data.error || "Dërgimi dështoi.");
+        return;
+      }
+      setThreadPageReplies((current) => [...current, data.reply]);
+      setThreadPageDraft("");
+    } catch (err) {
+      setThreadPageMessage("Nuk u arrit lidhja me serverin. Provoni përsëri.");
+    } finally {
+      setThreadPageSubmitting(false);
+    }
+  };
+
+  const loadAdminData = async (tab) => {
+    if (!currentUser) return;
+    const email = encodeURIComponent(currentUser.email);
+    try {
+      if (tab === "reports") {
+        const response = await fetch(`${API_URL}/api/admin/reports?email=${email}`);
+        const data = await response.json();
+        if (response.ok) setAdminReports(data.reports || []);
+      } else if (tab === "users") {
+        const response = await fetch(`${API_URL}/api/admin/users?email=${email}`);
+        const data = await response.json();
+        if (response.ok) setAdminUsers(data.users || []);
+      } else if (tab === "posts") {
+        const response = await fetch(`${API_URL}/api/admin/posts?email=${email}`);
+        const data = await response.json();
+        if (response.ok) setAdminPosts(data.posts || []);
+      }
+    } catch (err) {
+      // ignore
+    }
+  };
+
+  const handleSetAdminTab = (tab) => {
+    setAdminTab(tab);
+    loadAdminData(tab);
+  };
+
+  const handleToggleBusinessVerified = async (userId, businessVerified) => {
+    if (!currentUser) return;
+    try {
+      const response = await fetch(`${API_URL}/api/admin/users/${userId}/verify-business`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: currentUser.email, businessVerified }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setAdminUsers((current) =>
+          current.map((user) => (user.id === userId ? data.user : user)),
+        );
+        setAdminMessage(data.message);
+      }
+    } catch (err) {
+      // ignore
+    }
+  };
+
+  const handleToggleFeatured = async (postId, featured) => {
+    if (!currentUser) return;
+    try {
+      const response = await fetch(`${API_URL}/api/admin/posts/${postId}/feature`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: currentUser.email, featured }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setAdminPosts((current) =>
+          current.map((post) => (post.id === postId ? data.post : post)),
+        );
+        setAdminMessage(data.message);
+      }
+    } catch (err) {
+      // ignore
+    }
+  };
+
+  const handleAdminDeletePost = async (postId) => {
+    if (!currentUser) return;
+    try {
+      const response = await fetch(
+        `${API_URL}/api/admin/posts/${postId}?email=${encodeURIComponent(currentUser.email)}`,
+        { method: "DELETE" },
+      );
+      const data = await response.json();
+      if (response.ok) {
+        setAdminPosts((current) => current.filter((post) => post.id !== postId));
+        setAdminMessage(data.message);
+      }
+    } catch (err) {
+      // ignore
+    }
+  };
+
+  const handleSetReportStatus = async (reportId, status) => {
+    if (!currentUser) return;
+    try {
+      const response = await fetch(`${API_URL}/api/admin/reports/${reportId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: currentUser.email, status }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setAdminReports((current) =>
+          current.map((report) => (report.id === reportId ? data.report : report)),
+        );
+      }
+    } catch (err) {
+      // ignore
+    }
   };
 
   const topPosts = [...posts].sort((a, b) => b.clicks - a.clicks).slice(0, 3);
@@ -973,12 +1318,30 @@ function App() {
   );
   const isCategoryPage = Boolean(currentCategory);
   const categoryPosts = currentCategory
-    ? posts.filter(
-        (post) =>
-          post.category === currentCategory.title &&
-          (!selectedSubcategory || post.subcategory === selectedSubcategory),
-      )
+    ? posts.filter((post) => {
+        if (post.category !== currentCategory.title) return false;
+        if (selectedSubcategory && post.subcategory !== selectedSubcategory) return false;
+        if (filterCity && !(post.city || "").toLowerCase().includes(filterCity.toLowerCase())) {
+          return false;
+        }
+        if (filterSearch) {
+          const haystack = `${post.title} ${post.description}`.toLowerCase();
+          if (!haystack.includes(filterSearch.toLowerCase())) return false;
+        }
+        const numericPrice = Number(String(post.price).replace(/[^0-9.]/g, ""));
+        if (filterMinPrice && (!numericPrice || numericPrice < Number(filterMinPrice))) {
+          return false;
+        }
+        if (filterMaxPrice && (!numericPrice || numericPrice > Number(filterMaxPrice))) {
+          return false;
+        }
+        return true;
+      })
     : [];
+  const isThreadPageMatch = route.match(/^\/biseda\/([^/]+)$/);
+  const isThreadPage = Boolean(isThreadPageMatch);
+  const threadToken = isThreadPageMatch ? isThreadPageMatch[1] : null;
+  const isAdminPage = route === "/admin";
   const isAuthPage =
     route === "/auth" || route === "/login" || route === "/register";
   const isVerifyPage = route === "/verify";
@@ -1047,6 +1410,9 @@ function App() {
     setContactForm({ name: "", contact: "", message: "" });
     setContactMessage("");
     setContactTargetId(null);
+    setReportOpen(false);
+    setReportReason("");
+    setReportMessage("");
     setSelectedSubcategory(pendingSubcategory);
     setPendingSubcategory(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1158,6 +1524,58 @@ function App() {
         setPublicProfileMessage("Nuk u arrit lidhja me serverin. Provoni përsëri.");
       });
   }, [isProfilePage, profileUserId]);
+
+  useEffect(() => {
+    if (!isProfilePage || !profileUserId) return;
+    fetch(`${API_URL}/api/users/${profileUserId}/reviews`)
+      .then((response) => response.json())
+      .then((data) => {
+        setReviews(Array.isArray(data.reviews) ? data.reviews : []);
+        setReviewSummary(data.summary || { count: 0, average: 0 });
+      })
+      .catch(() => {});
+  }, [isProfilePage, profileUserId]);
+
+  useEffect(() => {
+    if (!currentUser) {
+      setFavoritePostIds([]);
+      return;
+    }
+    fetch(`${API_URL}/api/favorites?email=${encodeURIComponent(currentUser.email)}`)
+      .then((response) => response.json())
+      .then((data) => {
+        const ids = Array.isArray(data.posts) ? data.posts.map((post) => post.id) : [];
+        setFavoritePostIds(ids);
+      })
+      .catch(() => {});
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    if (!isThreadPage || !threadToken) return;
+    setThreadPageStatus("loading");
+    fetch(`${API_URL}/api/threads/${threadToken}`)
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) {
+          setThreadPageStatus("error");
+          setThreadPageMessage(data.error || "Biseda nuk u gjet.");
+          return;
+        }
+        setThreadPageData(data.thread);
+        setThreadPageReplies(data.replies || []);
+        setThreadPageStatus("success");
+      })
+      .catch(() => {
+        setThreadPageStatus("error");
+        setThreadPageMessage("Nuk u arrit lidhja me serverin. Provoni përsëri.");
+      });
+  }, [isThreadPage, threadToken]);
+
+  useEffect(() => {
+    if (!isAdminPage || !currentUser?.isAdmin) return;
+    loadAdminData(adminTab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdminPage, currentUser?.isAdmin]);
 
   const contactFormPanel = (
     <div className="auth-grid">
@@ -1288,7 +1706,9 @@ function App() {
           !isForgotPasswordPage &&
           !isResetPasswordPage &&
           !isProfilePage &&
-          !isPostPage && (
+          !isPostPage &&
+          !isThreadPage &&
+          !isAdminPage && (
         <section className="hero" id="home">
           <div className="container hero-content">
             <div>
@@ -1584,6 +2004,37 @@ function App() {
                     >
                       Mesazhet
                     </button>
+                    <button
+                      type="button"
+                      className={
+                        dashboardSection === "favorites"
+                          ? "dashboard-nav-item active"
+                          : "dashboard-nav-item"
+                      }
+                      onClick={openFavoritesSection}
+                    >
+                      Të preferuarat
+                    </button>
+                    <button
+                      type="button"
+                      className={
+                        dashboardSection === "stats"
+                          ? "dashboard-nav-item active"
+                          : "dashboard-nav-item"
+                      }
+                      onClick={openStatsSection}
+                    >
+                      Statistikat
+                    </button>
+                    {currentUser.isAdmin && (
+                      <a
+                        href="/admin"
+                        className="dashboard-nav-item"
+                        onClick={handleLinkClick("/admin")}
+                      >
+                        Admin
+                      </a>
+                    )}
                   </nav>
 
                   <div className="dashboard-content">
@@ -1600,6 +2051,16 @@ function App() {
                             {currentUser.isVerified ? "Verifikuar" : "Jo verifikuar"}
                           </strong>
                         </p>
+                        {currentUser.userType === "business" && (
+                          <p>
+                            Biznes i besueshëm:{" "}
+                            <strong>
+                              {currentUser.businessVerified
+                                ? "✓ Verifikuar nga eDiaspora"
+                                : "Ende jo"}
+                            </strong>
+                          </p>
+                        )}
                         {!currentUser.isVerified && (
                           <button
                             type="button"
@@ -1855,6 +2316,24 @@ function App() {
                               </div>
                             </label>
                             <label>
+                              Qyteti
+                              <input
+                                name="city"
+                                value={postForm.city}
+                                onChange={handlePostChange}
+                                placeholder="P.sh. Prishtinë"
+                              />
+                            </label>
+                            <label>
+                              Shteti
+                              <input
+                                name="country"
+                                value={postForm.country}
+                                onChange={handlePostChange}
+                                placeholder="P.sh. Kosovë"
+                              />
+                            </label>
+                            <label>
                               Fotot (maksimumi 5)
                               <input
                                 type="file"
@@ -1910,16 +2389,37 @@ function App() {
                                     <h4>{post.title}</h4>
                                     <p className="business-meta">
                                       {post.category} • {post.subcategory} • {post.type}
+                                      {post.featured && " • ⭐ Promovuar"}
                                     </p>
                                     <p>{post.description}</p>
                                     <p className="business-meta">Çmimi: {formatPrice(post.price)}</p>
-                                    <button
-                                      type="button"
-                                      className="button button-secondary post-edit-button"
-                                      onClick={() => handleEditPostClick(post)}
-                                    >
-                                      Ndrysho
-                                    </button>
+                                    {(post.city || post.country) && (
+                                      <p className="business-meta">
+                                        {[post.city, post.country].filter(Boolean).join(", ")}
+                                      </p>
+                                    )}
+                                    {post.expiresAt && (
+                                      <p className="business-meta">
+                                        {post.status === "expired" ? "Ka skaduar" : "Skadon"} më{" "}
+                                        {new Date(post.expiresAt).toLocaleDateString("sq")}
+                                      </p>
+                                    )}
+                                    <div className="profile-actions">
+                                      <button
+                                        type="button"
+                                        className="button button-secondary post-edit-button"
+                                        onClick={() => handleEditPostClick(post)}
+                                      >
+                                        Ndrysho
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="button button-secondary"
+                                        onClick={() => handleRenewPost(post.id)}
+                                      >
+                                        Rinovo
+                                      </button>
+                                    </div>
                                   </div>
                                 </article>
                               ))
@@ -2012,42 +2512,121 @@ function App() {
                               </div>
                               <p>{msg.message}</p>
 
-                              {msg.reply ? (
+                              {msg.reply && (
                                 <div className="message-reply">
                                   <p className="business-meta">Përgjigja jote:</p>
                                   <p>{msg.reply}</p>
                                 </div>
-                              ) : (
-                                <form
-                                  onSubmit={handleReplySubmit(msg.id)}
-                                  className="message-reply-form"
-                                >
-                                  <textarea
-                                    rows="3"
-                                    value={replyDrafts[msg.id] || ""}
-                                    onChange={(event) =>
-                                      handleReplyChange(msg.id, event.target.value)
-                                    }
-                                    placeholder="Shkruaj një përgjigje..."
-                                  />
-                                  <button
-                                    type="submit"
-                                    className="button button-primary"
-                                    disabled={replySubmittingId === msg.id}
-                                  >
-                                    {replySubmittingId === msg.id
-                                      ? "Duke dërguar..."
-                                      : "Përgjigju"}
-                                  </button>
-                                  {replyFeedback[msg.id] && (
-                                    <p className="form-message">{replyFeedback[msg.id]}</p>
-                                  )}
-                                </form>
                               )}
+
+                              <button
+                                type="button"
+                                className="button button-secondary"
+                                onClick={() => openMessageThread(msg.id)}
+                              >
+                                {activeThreadId === msg.id ? "Mbyll bisedën" : "Shiko bisedën e plotë"}
+                              </button>
+
+                              {activeThreadId === msg.id && (
+                                <div className="message-thread">
+                                  {activeThreadReplies.map((reply) => (
+                                    <p key={reply.id} className="business-meta">
+                                      <strong>{reply.sender === "recipient" ? "Ti" : msg.senderName}:</strong>{" "}
+                                      {reply.body}
+                                    </p>
+                                  ))}
+                                </div>
+                              )}
+
+                              <form
+                                onSubmit={handleReplySubmit(msg.id)}
+                                className="message-reply-form"
+                              >
+                                <textarea
+                                  rows="3"
+                                  value={replyDrafts[msg.id] || ""}
+                                  onChange={(event) =>
+                                    handleReplyChange(msg.id, event.target.value)
+                                  }
+                                  placeholder="Shkruaj një përgjigje..."
+                                />
+                                <button
+                                  type="submit"
+                                  className="button button-primary"
+                                  disabled={replySubmittingId === msg.id}
+                                >
+                                  {replySubmittingId === msg.id
+                                    ? "Duke dërguar..."
+                                    : "Përgjigju"}
+                                </button>
+                                {replyFeedback[msg.id] && (
+                                  <p className="form-message">{replyFeedback[msg.id]}</p>
+                                )}
+                              </form>
                             </article>
                           ))
                         ) : (
                           <p>Nuk ke ende mesazhe.</p>
+                        )}
+                      </div>
+                    )}
+
+                    {dashboardSection === "favorites" && (
+                      <div className="posts-list">
+                        <h4>Të preferuarat</h4>
+                        {favoritePosts.length > 0 ? (
+                          favoritePosts.map((post) => (
+                            <article key={post.id} className="business-card">
+                              <div>
+                                <h4>{post.title}</h4>
+                                <p className="business-meta">
+                                  {post.category} • {post.subcategory}
+                                </p>
+                                <span className="price">{formatPrice(post.price)}</span>
+                                <div className="profile-actions">
+                                  <a
+                                    href={`/postim/${post.id}`}
+                                    className="button button-secondary"
+                                    onClick={handleLinkClick(`/postim/${post.id}`)}
+                                  >
+                                    Shiko postimin
+                                  </a>
+                                  <button
+                                    type="button"
+                                    className="button button-secondary"
+                                    onClick={() => handleToggleFavorite(post.id)}
+                                  >
+                                    Hiq nga të preferuarat
+                                  </button>
+                                </div>
+                              </div>
+                            </article>
+                          ))
+                        ) : (
+                          <p>Nuk ke shpallje të ruajtura ende.</p>
+                        )}
+                      </div>
+                    )}
+
+                    {dashboardSection === "stats" && (
+                      <div className="dashboard-overview">
+                        <h4>Statistikat</h4>
+                        {dashboardStats ? (
+                          <>
+                            <p>Postime aktive: <strong>{dashboardStats.postCount}</strong></p>
+                            <p>Klikime gjithsej: <strong>{dashboardStats.totalClicks}</strong></p>
+                            <p>Mesazhe të pranuara: <strong>{dashboardStats.messageCount}</strong></p>
+                            <p>
+                              Vlerësimi mesatar:{" "}
+                              <strong>
+                                {dashboardStats.reviewCount > 0
+                                  ? `${dashboardStats.averageRating.toFixed(1)} / 5 (${dashboardStats.reviewCount} vlerësime)`
+                                  : "Ende pa vlerësime"}
+                              </strong>
+                            </p>
+                          </>
+                        ) : (
+                          <p>Duke ngarkuar statistikat...</p>
                         )}
                       </div>
                     )}
@@ -2243,6 +2822,45 @@ function App() {
               ))}
             </div>
 
+            <div className="filter-bar">
+              <input
+                value={filterSearch}
+                onChange={(event) => setFilterSearch(event.target.value)}
+                placeholder="Kërko sipas titullit ose përshkrimit"
+              />
+              <input
+                value={filterCity}
+                onChange={(event) => setFilterCity(event.target.value)}
+                placeholder="Qyteti"
+              />
+              <input
+                type="number"
+                value={filterMinPrice}
+                onChange={(event) => setFilterMinPrice(event.target.value)}
+                placeholder="Çmimi min"
+              />
+              <input
+                type="number"
+                value={filterMaxPrice}
+                onChange={(event) => setFilterMaxPrice(event.target.value)}
+                placeholder="Çmimi max"
+              />
+              {(filterSearch || filterCity || filterMinPrice || filterMaxPrice) && (
+                <button
+                  type="button"
+                  className="button button-secondary"
+                  onClick={() => {
+                    setFilterSearch("");
+                    setFilterCity("");
+                    setFilterMinPrice("");
+                    setFilterMaxPrice("");
+                  }}
+                >
+                  Pastro filtrat
+                </button>
+              )}
+            </div>
+
             <div className="section-header">
               <div>
                 <p className="eyebrow">Postimet</p>
@@ -2280,8 +2898,22 @@ function App() {
                         <span aria-hidden="true">{currentCategory.emoji}</span>
                       )}
                     </a>
+                    <button
+                      type="button"
+                      className="favorite-toggle"
+                      aria-label={isFavorite(post.id) ? "Hiq nga të preferuarat" : "Shto te të preferuarat"}
+                      onClick={() => handleToggleFavorite(post.id)}
+                    >
+                      {isFavorite(post.id) ? "♥" : "♡"}
+                    </button>
                     <div className="post-compact-body">
                       <span className="tag tag-sm">{post.subcategory}</span>
+                      {post.featured && <span className="tag tag-sm tag-featured">⭐ Promovuar</span>}
+                      {(post.city || post.country) && (
+                        <span className="business-meta">
+                          {[post.city, post.country].filter(Boolean).join(", ")}
+                        </span>
+                      )}
                       <a
                         href={`/postim/${post.id}`}
                         className="post-compact-title-link"
@@ -2329,9 +2961,22 @@ function App() {
                 <div className="section-header">
                   <div>
                     <p className="eyebrow">Profili</p>
-                    <h2>{publicProfileUser.name}</h2>
+                    <h2>
+                      {publicProfileUser.name}{" "}
+                      {publicProfileUser.businessVerified && (
+                        <span className="verified-badge" title="Biznes i verifikuar nga eDiaspora">
+                          ✓ Verifikuar
+                        </span>
+                      )}
+                    </h2>
                     {publicProfileUser.userType === "business" &&
                       publicProfileUser.company && <p>{publicProfileUser.company}</p>}
+                    {reviewSummary.count > 0 && (
+                      <p className="business-meta">
+                        {"⭐".repeat(Math.round(reviewSummary.average))} {reviewSummary.average.toFixed(1)} / 5{" "}
+                        ({reviewSummary.count} vlerësime)
+                      </p>
+                    )}
                   </div>
                   <div className="profile-actions">
                     <button
@@ -2374,6 +3019,62 @@ function App() {
                   ) : (
                     <p>Ky user nuk ka shtuar ende punë të kryera.</p>
                   )}
+                </div>
+
+                <div className="reviews-section">
+                  <h4>Vlerësimet</h4>
+                  {reviews.length > 0 ? (
+                    reviews.map((review) => (
+                      <article key={review.id} className="message-card">
+                        <div className="message-card-header">
+                          <strong>{review.reviewerName}</strong>
+                          <span className="business-meta">{"⭐".repeat(review.rating)}</span>
+                        </div>
+                        {review.comment && <p>{review.comment}</p>}
+                      </article>
+                    ))
+                  ) : (
+                    <p>Ende pa vlerësime.</p>
+                  )}
+
+                  <div className="post-form-card">
+                    <h4>Lini një vlerësim</h4>
+                    <form onSubmit={handleReviewSubmit(profileUserId)} className="registration-form">
+                      <label>
+                        Emri juaj
+                        <input
+                          name="reviewerName"
+                          value={reviewForm.reviewerName}
+                          onChange={handleReviewChange}
+                          placeholder="Emri juaj"
+                        />
+                      </label>
+                      <label>
+                        Vlerësimi
+                        <select name="rating" value={reviewForm.rating} onChange={handleReviewChange}>
+                          {[5, 4, 3, 2, 1].map((value) => (
+                            <option key={value} value={value}>
+                              {"⭐".repeat(value)} ({value}/5)
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        Komenti (opsional)
+                        <textarea
+                          name="comment"
+                          value={reviewForm.comment}
+                          onChange={handleReviewChange}
+                          rows="3"
+                          placeholder="Përshkruaj përvojën tënde"
+                        />
+                      </label>
+                      <button type="submit" className="button button-primary" disabled={reviewSubmitting}>
+                        {reviewSubmitting ? "Duke dërguar..." : "Dërgo vlerësimin"}
+                      </button>
+                      {reviewMessage && <p className="form-message">{reviewMessage}</p>}
+                    </form>
+                  </div>
                 </div>
               </>
             )}
@@ -2488,6 +3189,13 @@ function App() {
                         >
                           {contactOpen ? "Mbyll kontaktin" : "Kontakto"}
                         </button>
+                        <button
+                          type="button"
+                          className="button button-secondary"
+                          onClick={() => handleToggleFavorite(currentPost.id)}
+                        >
+                          {isFavorite(currentPost.id) ? "♥ Ruajtur" : "♡ Ruaj"}
+                        </button>
                       </div>
                     )}
 
@@ -2495,11 +3203,237 @@ function App() {
 
                     <div className="post-detail-box">
                       <span className="tag">{currentPost.type}</span>
+                      {currentPost.featured && <span className="tag tag-featured">⭐ Promovuar</span>}
                       <span className="price">{formatPrice(currentPost.price)}</span>
+                      {(currentPost.city || currentPost.country) && (
+                        <p className="business-meta">
+                          {[currentPost.city, currentPost.country].filter(Boolean).join(", ")}
+                        </p>
+                      )}
                       <p className="post-detail-box-desc">{currentPost.description}</p>
+                    </div>
+
+                    <div className="report-section">
+                      <button
+                        type="button"
+                        className="link-button"
+                        onClick={() => setReportOpen((current) => !current)}
+                      >
+                        {reportOpen ? "Mbyll raportimin" : "Raporto këtë shpallje"}
+                      </button>
+                      {reportOpen && (
+                        <form onSubmit={handleReportSubmit(currentPost.id)} className="message-reply-form">
+                          <textarea
+                            rows="2"
+                            value={reportReason}
+                            onChange={(event) => setReportReason(event.target.value)}
+                            placeholder="Pse po e raporton këtë shpallje?"
+                          />
+                          <button type="submit" className="button button-secondary" disabled={reportSubmitting}>
+                            {reportSubmitting ? "Duke dërguar..." : "Dërgo raportimin"}
+                          </button>
+                          {reportMessage && <p className="form-message">{reportMessage}</p>}
+                        </form>
+                      )}
                     </div>
                   </div>
                 </div>
+              </>
+            )}
+          </section>
+        ) : isThreadPage ? (
+          <section className="category-page container">
+            {threadPageStatus === "loading" ? (
+              <p>Duke ngarkuar bisedën...</p>
+            ) : threadPageStatus === "error" ? (
+              <div className="verify-card">
+                <h2>Biseda nuk u gjet</h2>
+                <p>{threadPageMessage}</p>
+              </div>
+            ) : (
+              <>
+                <div className="section-header">
+                  <div>
+                    <p className="eyebrow">Biseda</p>
+                    <h2>Biseda me {threadPageData.recipientName || "biznesin"}</h2>
+                  </div>
+                </div>
+                <div className="messages-list">
+                  <article className="message-card">
+                    <div className="message-card-header">
+                      <strong>{threadPageData.senderName}</strong>
+                    </div>
+                    <p>{threadPageData.message}</p>
+                  </article>
+                  {threadPageReplies.map((reply) => (
+                    <article key={reply.id} className="message-card">
+                      <div className="message-card-header">
+                        <strong>{reply.sender === "recipient" ? threadPageData.recipientName : threadPageData.senderName}</strong>
+                      </div>
+                      <p>{reply.body}</p>
+                    </article>
+                  ))}
+                  <form onSubmit={handleThreadPageReply} className="message-reply-form">
+                    <textarea
+                      rows="3"
+                      value={threadPageDraft}
+                      onChange={(event) => setThreadPageDraft(event.target.value)}
+                      placeholder="Shkruaj një përgjigje..."
+                    />
+                    <button type="submit" className="button button-primary" disabled={threadPageSubmitting}>
+                      {threadPageSubmitting ? "Duke dërguar..." : "Dërgo"}
+                    </button>
+                    {threadPageMessage && <p className="form-message">{threadPageMessage}</p>}
+                  </form>
+                </div>
+              </>
+            )}
+          </section>
+        ) : isAdminPage ? (
+          <section className="category-page container">
+            {!currentUser?.isAdmin ? (
+              <div className="verify-card">
+                <h2>Qasje e ndaluar</h2>
+                <p>Kjo faqe është vetëm për administratorët.</p>
+                <a href="/" onClick={handleLinkClick("/")} className="button button-primary">
+                  Kthehu në fillim
+                </a>
+              </div>
+            ) : (
+              <>
+                <div className="section-header">
+                  <div>
+                    <p className="eyebrow">Admin</p>
+                    <h2>Paneli i moderimit</h2>
+                  </div>
+                </div>
+
+                <div className="dashboard-tabs">
+                  <button
+                    type="button"
+                    className={adminTab === "reports" ? "dashboard-tab active" : "dashboard-tab"}
+                    onClick={() => handleSetAdminTab("reports")}
+                  >
+                    Raportimet
+                  </button>
+                  <button
+                    type="button"
+                    className={adminTab === "users" ? "dashboard-tab active" : "dashboard-tab"}
+                    onClick={() => handleSetAdminTab("users")}
+                  >
+                    Përdoruesit
+                  </button>
+                  <button
+                    type="button"
+                    className={adminTab === "posts" ? "dashboard-tab active" : "dashboard-tab"}
+                    onClick={() => handleSetAdminTab("posts")}
+                  >
+                    Postimet
+                  </button>
+                </div>
+
+                {adminMessage && <p className="form-message">{adminMessage}</p>}
+
+                {adminTab === "reports" && (
+                  <div className="messages-list">
+                    {adminReports.length > 0 ? (
+                      adminReports.map((report) => (
+                        <article key={report.id} className="message-card">
+                          <div className="message-card-header">
+                            <strong>Postimi #{report.postId}</strong>
+                            <span className="business-meta">{report.status}</span>
+                          </div>
+                          <p>{report.reason}</p>
+                          {report.reporterName && <p className="business-meta">Nga: {report.reporterName}</p>}
+                          <div className="profile-actions">
+                            <a
+                              href={`/postim/${report.postId}`}
+                              className="button button-secondary"
+                              onClick={handleLinkClick(`/postim/${report.postId}`)}
+                            >
+                              Shiko postimin
+                            </a>
+                            <button
+                              type="button"
+                              className="button button-secondary"
+                              onClick={() => handleSetReportStatus(report.id, "resolved")}
+                            >
+                              Zgjidh
+                            </button>
+                            <button
+                              type="button"
+                              className="button button-secondary"
+                              onClick={() => handleSetReportStatus(report.id, "dismissed")}
+                            >
+                              Refuzo
+                            </button>
+                          </div>
+                        </article>
+                      ))
+                    ) : (
+                      <p>Nuk ka raportime.</p>
+                    )}
+                  </div>
+                )}
+
+                {adminTab === "users" && (
+                  <div className="messages-list">
+                    {adminUsers.map((user) => (
+                      <article key={user.id} className="message-card">
+                        <div className="message-card-header">
+                          <strong>{user.name}</strong>
+                          <span className="business-meta">{user.email}</span>
+                        </div>
+                        <p className="business-meta">
+                          {user.userType} {user.company ? `• ${user.company}` : ""}
+                        </p>
+                        {user.userType === "business" && (
+                          <button
+                            type="button"
+                            className="button button-secondary"
+                            onClick={() =>
+                              handleToggleBusinessVerified(user.id, !user.businessVerified)
+                            }
+                          >
+                            {user.businessVerified ? "Hiq verifikimin" : "Verifiko biznesin"}
+                          </button>
+                        )}
+                      </article>
+                    ))}
+                  </div>
+                )}
+
+                {adminTab === "posts" && (
+                  <div className="messages-list">
+                    {adminPosts.map((post) => (
+                      <article key={post.id} className="message-card">
+                        <div className="message-card-header">
+                          <strong>{post.title}</strong>
+                          <span className="business-meta">{post.status}</span>
+                        </div>
+                        <p className="business-meta">
+                          {post.category} • {post.subcategory}
+                        </p>
+                        <div className="profile-actions">
+                          <button
+                            type="button"
+                            className="button button-secondary"
+                            onClick={() => handleToggleFeatured(post.id, !post.featured)}
+                          >
+                            {post.featured ? "Hiq promovimin" : "Promovo"}
+                          </button>
+                          <button
+                            type="button"
+                            className="button button-secondary"
+                            onClick={() => handleAdminDeletePost(post.id)}
+                          >
+                            Fshi
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                )}
               </>
             )}
           </section>

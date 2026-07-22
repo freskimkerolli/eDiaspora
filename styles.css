@@ -1254,6 +1254,87 @@ img {
   }
 }
 
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 1.5rem;
+}
+
+.filter-bar input {
+  flex: 1 1 160px;
+  padding: 0.65rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid rgba(17, 24, 39, 0.14);
+  font: inherit;
+}
+
+.post-compact-card {
+  position: relative;
+}
+
+.favorite-toggle {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  border: none;
+  background: rgba(255, 255, 255, 0.9);
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #c9922f;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+}
+
+.tag-featured {
+  background: #c9922f;
+}
+
+.verified-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #1f9d55;
+  background: rgba(31, 157, 85, 0.12);
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  vertical-align: middle;
+}
+
+.reviews-section {
+  margin-top: 2rem;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.message-thread {
+  background: #f9faf8;
+  border-radius: 12px;
+  padding: 0.85rem;
+  margin: 0.75rem 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.report-section {
+  margin-top: 1rem;
+}
+
+.link-button {
+  border: none;
+  background: none;
+  color: #6b7280;
+  font-size: 0.85rem;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+}
+
 @media (max-width: 640px) {
   .hero {
     padding-top: 3rem;
